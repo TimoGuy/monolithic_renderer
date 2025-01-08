@@ -1,3 +1,5 @@
+third_party/glfw-3.4/
+
 # VSCode cache file.
 .vscode/
 

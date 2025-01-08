@@ -17,21 +17,43 @@ if(MSVC)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /MP")
 endif()
 
-# Static library build for `monolithic_renderer_component`
-add_library(monolithic_renderer_component STATIC)
+# Dependencies.
+if(WIN32)
+    # Windows renderer uses Vulkan and GLFW for windowing.
+    find_package(Vulkan REQUIRED)
+    add_subdirectory("third_party/glfw")
+else()
+    message(FATAL_ERROR "Unsupported OS.")
+endif()
 
-target_include_directories(monolithic_renderer_component
+# Static library build.
+add_library(${PROJECT_NAME} STATIC)
+
+target_include_directories(${PROJECT_NAME}
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
-        # ${CMAKE_CURRENT_SOURCE_DIR}/src/example
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/example
+        ${CMAKE_CURRENT_SOURCE_DIR}/third_party/glfw/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/third_party/vk-bootstrap
+        ${Vulkan_INCLUDE_DIR}
 )
 
-target_sources(monolithic_renderer_component
+target_sources(${PROJECT_NAME}
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include/monolithic_renderer_public.h
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src/renderer.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/renderer.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/example/example_main.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/third_party/vk-bootstrap/VkBootstrap.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/third_party/vk-bootstrap/VkBootstrap.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/third_party/vk-bootstrap/VkBootstrapDispatch.h
+)
+
+target_link_libraries(${PROJECT_NAME}
+    glfw
+    ${GLFW_LIBRARIES}
+    Vulkan::Vulkan
 )
