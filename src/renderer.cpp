@@ -15,9 +15,6 @@
 #include "VkBootstrap.h"
 
 
-constexpr int32_t k_window_width{ 1920 };
-constexpr int32_t k_window_height{ 1080 };
-
 static void key_callback(GLFWwindow* window, int32_t key, int32_t scancode, int32_t action, int32_t mods)
 {
 
@@ -26,26 +23,14 @@ static void key_callback(GLFWwindow* window, int32_t key, int32_t scancode, int3
 class Monolithic_renderer::Impl
 {
 public:
-    Impl(const std::string& name)
+    Impl(const std::string& name, int32_t content_width, int32_t content_height)
         : m_name(name)
+        , m_window_width(content_width)
+        , m_window_height(content_height)
     {
     }
 
-    bool build()
-    {
-        bool success{ true };
-        success &= build_window();
-        success &= build_vulkan_renderer();
-        return success;
-    }
-
-    bool teardown()
-    {
-        bool success{ true };
-        success &= teardown_vulkan_renderer();
-        success &= teardown_window();
-        return success;
-    }
+    std::atomic_size_t m_stage{ 0 };
 
     void tick()
     {
@@ -56,6 +41,70 @@ public:
     bool get_requesting_close()
     {
         return glfwWindowShouldClose(m_window);
+    }
+
+    // Jobs.
+    class Build_job : public Job_ifc
+    {
+    public:
+        Build_job(Job_source& source)
+            : Job_ifc("Renderer Build job", source)
+        {
+        }
+
+        int32_t execute() override
+        {
+            bool success{ true };
+            success &= build_window();
+            success &= build_vulkan_renderer();
+            return success ? 0 : 1;
+        }
+    };
+    std::unique_ptr<Build_job> m_build_job{ std::make_unique<Build_job>{ *this } };
+
+    class Teardown_job : public Job_ifc
+    {
+    public:
+        Teardown_job(Job_source& source)
+            : Job_ifc("Renderer Teardown job", source)
+        {
+        }
+
+        int32_t execute() override
+        {
+            bool success{ true };
+            success &= teardown_vulkan_renderer();
+            success &= teardown_window();
+            return success ? 0 : 1;
+        }
+    };
+    std::unique_ptr<Teardown_job> m_teardown_job{ std::make_unique<Teardown_job>{ *this } };
+
+    // Fetch next jobs.
+    std::vector<Job_ifc*> fetch_next_jobs_callback()
+    {
+        std::vector<Job_ifc*> jobs;
+
+        switch (m_stage.load())
+        {
+            case 0:
+                jobs = {
+                    m_build_job.get(),
+                };
+                m_stage++;
+                break;
+
+            case 1:
+                break;
+
+            case 2:
+                jobs = {
+                    m_teardown_job.get(),
+                };
+                m_stage++;
+                break;
+        }
+
     }
 
 private:
@@ -72,7 +121,7 @@ private:
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
         glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);  // @TODO: Have change sizing functions (but not controllable from directly controlling the window).
 
-        m_window = glfwCreateWindow(k_window_width, k_window_height, m_name.c_str(), nullptr, nullptr);
+        m_window = glfwCreateWindow(m_window_width, m_window_height, m_name.c_str(), nullptr, nullptr);
         if (!m_window)
         {
             std::cerr << "ERROR: Window creation failed." << std::endl;
@@ -220,7 +269,7 @@ private:
             swapchain_builder
                 .use_default_format_selection()
                 .set_desired_present_mode(VK_PRESENT_MODE_MAILBOX_KHR)  // Mailbox (G-/Freesync compatible).
-                .set_desired_extent(k_window_width, k_window_height)
+                .set_desired_extent(m_window_width, m_window_height)
                 .build()
                 .value()
         };
@@ -261,6 +310,9 @@ private:
     }
 
     std::string m_name;
+    int32_t m_window_width;
+    int32_t m_window_height;
+
     GLFWwindow* m_window{ nullptr };
     VkInstance m_v_instance{ nullptr };
 #if _DEBUG
@@ -285,8 +337,11 @@ private:
 
 
 // Implementation wrapper.
-Monolithic_renderer::Monolithic_renderer(const std::string& name)
-    : m_pimpl(std::make_unique<Impl>(name))
+Monolithic_renderer::Monolithic_renderer(
+    const std::string& name,
+    int32_t content_width,
+    int32_t content_height)
+    : m_pimpl(std::make_unique<Impl>(name, content_width, content_height))
 {
 }
 
@@ -312,4 +367,9 @@ void Monolithic_renderer::tick()
 bool Monolithic_renderer::get_requesting_close()
 {
     return m_pimpl->get_requesting_close();
+}
+
+std::vector<Job_ifc*> Monolithic_renderer::fetch_next_jobs_callback()
+{
+    return m_pimpl->fetch_next_jobs_callback();
 }
