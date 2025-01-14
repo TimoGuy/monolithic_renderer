@@ -46,7 +46,7 @@ target_include_directories(${PROJECT_NAME}
         ${CMAKE_CURRENT_SOURCE_DIR}/third_party/glfw/include
         ${CMAKE_CURRENT_SOURCE_DIR}/third_party/vk-bootstrap
         ${Vulkan_INCLUDE_DIR}
-        # ${multithreaded_job_system_INCLUDE_DIR}
+        ${multithreaded_job_system_INCLUDE_DIR}
 )
 
 target_sources(${PROJECT_NAME}
