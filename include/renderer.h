@@ -12,11 +12,9 @@ public:
     Monolithic_renderer(const std::string& name, int32_t content_width, int32_t content_height);
     ~Monolithic_renderer();
 
-    bool build();
-    bool teardown();
-
-    void tick();
-    bool get_requesting_close();
+    bool is_renderer_requesting_close();
+    void request_shutdown_renderer();
+    bool is_renderer_finished_shutdown();
 
 private:
     std::vector<Job_ifc*> fetch_next_jobs_callback() override;

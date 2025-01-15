@@ -35,7 +35,14 @@ else()
 endif()
 
 # Static library build.
-add_library(${PROJECT_NAME} STATIC)
+add_library(${PROJECT_NAME}
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/renderer.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/renderer.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/example/example_main.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/vk-bootstrap/VkBootstrap.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/vk-bootstrap/VkBootstrap.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/vk-bootstrap/VkBootstrapDispatch.h
+)
 
 target_include_directories(${PROJECT_NAME}
     PUBLIC
@@ -47,18 +54,6 @@ target_include_directories(${PROJECT_NAME}
         ${CMAKE_CURRENT_SOURCE_DIR}/third_party/vk-bootstrap
         ${Vulkan_INCLUDE_DIR}
         ${multithreaded_job_system_INCLUDE_DIR}
-)
-
-target_sources(${PROJECT_NAME}
-    PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/monolithic_renderer_public.h
-    PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/renderer.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/renderer.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/example/example_main.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/third_party/vk-bootstrap/VkBootstrap.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/third_party/vk-bootstrap/VkBootstrap.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/third_party/vk-bootstrap/VkBootstrapDispatch.h
 )
 
 target_link_libraries(${PROJECT_NAME}

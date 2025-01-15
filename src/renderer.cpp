@@ -23,14 +23,26 @@ static void key_callback(GLFWwindow* window, int32_t key, int32_t scancode, int3
 class Monolithic_renderer::Impl
 {
 public:
-    Impl(const std::string& name, int32_t content_width, int32_t content_height)
+    Impl(const std::string& name, int32_t content_width, int32_t content_height, Job_source& source)
         : m_name(name)
         , m_window_width(content_width)
         , m_window_height(content_height)
+        , m_build_job(std::make_unique<Build_job>(source, *this))
+        , m_teardown_job(std::make_unique<Teardown_job>(source, *this))
     {
     }
 
-    std::atomic_size_t m_stage{ 0 };
+    enum class Stage : uint32_t
+    {
+        BUILD = 0,
+        UPDATE_DATA,
+        RENDER,
+        TEARDOWN,
+        EXIT,
+    };
+    std::atomic<Stage> m_stage{ Stage::BUILD };
+    std::atomic_bool m_shutdown_flag{ false };
+    std::atomic_bool m_finished_shutdown{ false };
 
     void tick()
     {
@@ -38,47 +50,103 @@ public:
         render();
     }
 
-    bool get_requesting_close()
+    bool is_requesting_close()
     {
         return glfwWindowShouldClose(m_window);
+    }
+
+    void request_shutdown()
+    {
+        m_shutdown_flag = true;
+    }
+
+    bool is_finished_shutdown()
+    {
+        return m_finished_shutdown;
     }
 
     // Jobs.
     class Build_job : public Job_ifc
     {
     public:
-        Build_job(Job_source& source)
+        Build_job(Job_source& source, Monolithic_renderer::Impl& pimpl)
             : Job_ifc("Renderer Build job", source)
+            , m_pimpl(pimpl)
         {
         }
 
         int32_t execute() override
         {
             bool success{ true };
-            success &= build_window();
-            success &= build_vulkan_renderer();
+            success &= m_pimpl.build_window();
+            success &= m_pimpl.build_vulkan_renderer();
             return success ? 0 : 1;
         }
+
+        Monolithic_renderer::Impl& m_pimpl;
     };
-    std::unique_ptr<Build_job> m_build_job{ std::make_unique<Build_job>{ *this } };
+    std::unique_ptr<Build_job> m_build_job;
+
+    class Update_data_job : public Job_ifc
+    {
+    public:
+        Update_data_job(Job_source& source, Monolithic_renderer::Impl& pimpl)
+            : Job_ifc("Renderer Update Data job", source)
+            , m_pimpl(pimpl)
+        {
+        }
+
+        int32_t execute() override
+        {
+            bool success{ true };
+            // @TODO
+            return success ? 0 : 1;
+        }
+
+        Monolithic_renderer::Impl& m_pimpl;
+    };
+    std::unique_ptr<Update_data_job> m_update_data_job;
+
+    class Render_job : public Job_ifc
+    {
+    public:
+        Render_job(Job_source& source, Monolithic_renderer::Impl& pimpl)
+            : Job_ifc("Renderer Render job", source)
+            , m_pimpl(pimpl)
+        {
+        }
+
+        int32_t execute() override
+        {
+            bool success{ true };
+            // @TODO
+            return success ? 0 : 1;
+        }
+
+        Monolithic_renderer::Impl& m_pimpl;
+    };
+    std::unique_ptr<Render_job> m_render_job;
 
     class Teardown_job : public Job_ifc
     {
     public:
-        Teardown_job(Job_source& source)
+        Teardown_job(Job_source& source, Monolithic_renderer::Impl& pimpl)
             : Job_ifc("Renderer Teardown job", source)
+            , m_pimpl(pimpl)
         {
         }
 
         int32_t execute() override
         {
             bool success{ true };
-            success &= teardown_vulkan_renderer();
-            success &= teardown_window();
+            success &= m_pimpl.teardown_vulkan_renderer();
+            success &= m_pimpl.teardown_window();
             return success ? 0 : 1;
         }
+
+        Monolithic_renderer::Impl& m_pimpl;
     };
-    std::unique_ptr<Teardown_job> m_teardown_job{ std::make_unique<Teardown_job>{ *this } };
+    std::unique_ptr<Teardown_job> m_teardown_job;
 
     // Fetch next jobs.
     std::vector<Job_ifc*> fetch_next_jobs_callback()
@@ -87,24 +155,40 @@ public:
 
         switch (m_stage.load())
         {
-            case 0:
+            case Stage::BUILD:
                 jobs = {
                     m_build_job.get(),
                 };
-                m_stage++;
+                m_stage = Stage::UPDATE_DATA;
                 break;
 
-            case 1:
+            case Stage::UPDATE_DATA:
+                jobs = {
+                    m_update_data_job.get(),
+                };
+                m_stage = Stage::RENDER;
                 break;
 
-            case 2:
+            case Stage::RENDER:
+                jobs = {
+                    m_render_job.get(),
+                };
+                m_stage = (m_shutdown_flag ? Stage::RENDER : Stage::RENDER);
+                break;
+
+            case Stage::TEARDOWN:
                 jobs = {
                     m_teardown_job.get(),
                 };
-                m_stage++;
+                m_stage = Stage::EXIT;
+                break;
+
+            case Stage::EXIT:
+                m_finished_shutdown = true;
                 break;
         }
 
+        return jobs;
     }
 
 private:
@@ -341,7 +425,7 @@ Monolithic_renderer::Monolithic_renderer(
     const std::string& name,
     int32_t content_width,
     int32_t content_height)
-    : m_pimpl(std::make_unique<Impl>(name, content_width, content_height))
+    : m_pimpl(std::make_unique<Impl>(name, content_width, content_height, *this))
 {
 }
 
@@ -349,24 +433,19 @@ Monolithic_renderer::Monolithic_renderer(
 //        in the .cpp file, even if it's `default`.
 Monolithic_renderer::~Monolithic_renderer() = default;
 
-bool Monolithic_renderer::build()
+bool Monolithic_renderer::is_renderer_requesting_close()
 {
-    return m_pimpl->build();
+    return m_pimpl->is_requesting_close();
 }
 
-bool Monolithic_renderer::teardown()
+void Monolithic_renderer::request_shutdown_renderer()
 {
-    return m_pimpl->teardown();
+    m_pimpl->request_shutdown();
 }
 
-void Monolithic_renderer::tick()
+bool Monolithic_renderer::is_renderer_finished_shutdown()
 {
-    m_pimpl->tick();
-}
-
-bool Monolithic_renderer::get_requesting_close()
-{
-    return m_pimpl->get_requesting_close();
+    return m_pimpl->is_finished_shutdown();
 }
 
 std::vector<Job_ifc*> Monolithic_renderer::fetch_next_jobs_callback()
