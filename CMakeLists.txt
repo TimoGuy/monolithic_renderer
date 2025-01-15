@@ -38,7 +38,8 @@ endif()
 add_library(${PROJECT_NAME}
     ${CMAKE_CURRENT_SOURCE_DIR}/src/renderer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/renderer.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/example/example_main.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/vma_impl.cpp
+    # ${CMAKE_CURRENT_SOURCE_DIR}/src/example/example_main.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/vk-bootstrap/VkBootstrap.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/vk-bootstrap/VkBootstrap.h
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/vk-bootstrap/VkBootstrapDispatch.h
@@ -52,6 +53,7 @@ target_include_directories(${PROJECT_NAME}
         ${CMAKE_CURRENT_SOURCE_DIR}/src/example
         ${CMAKE_CURRENT_SOURCE_DIR}/third_party/glfw/include
         ${CMAKE_CURRENT_SOURCE_DIR}/third_party/vk-bootstrap
+        ${CMAKE_CURRENT_SOURCE_DIR}/third_party/VulkanMemoryAllocator/include
         ${Vulkan_INCLUDE_DIR}
         ${multithreaded_job_system_INCLUDE_DIR}
 )

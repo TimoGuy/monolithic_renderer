@@ -4,9 +4,9 @@
 // Platform-specific implementations.
 #if _WIN64  // Windows implementation.
 
-// @NOTE: Vulkan and GLFW have to be included in this order.
+// @NOTE: Vulkan, VMA, and GLFW have to be included in this order.
 #include <vulkan/vulkan.h>
-#include <vma/vk_mem_alloc.h>
+#include <vk_mem_alloc.h>
 #include <GLFW/glfw3.h>
 
 #include <cinttypes>
