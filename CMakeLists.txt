@@ -56,6 +56,7 @@ target_include_directories(${PROJECT_NAME}
         ${CMAKE_CURRENT_SOURCE_DIR}/third_party/VulkanMemoryAllocator/include
         ${Vulkan_INCLUDE_DIR}
         ${multithreaded_job_system_INCLUDE_DIR}
+        ${cglm_INCLUDE_DIR}
 )
 
 target_link_libraries(${PROJECT_NAME}
