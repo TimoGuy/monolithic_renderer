@@ -38,7 +38,6 @@ endif()
 add_library(${PROJECT_NAME}
     ${CMAKE_CURRENT_SOURCE_DIR}/src/renderer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/renderer.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/vma_impl.cpp
     # ${CMAKE_CURRENT_SOURCE_DIR}/src/example/example_main.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/vk-bootstrap/VkBootstrap.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/vk-bootstrap/VkBootstrap.h
@@ -54,9 +53,10 @@ target_include_directories(${PROJECT_NAME}
         ${CMAKE_CURRENT_SOURCE_DIR}/third_party/glfw/include
         ${CMAKE_CURRENT_SOURCE_DIR}/third_party/vk-bootstrap
         ${CMAKE_CURRENT_SOURCE_DIR}/third_party/VulkanMemoryAllocator/include
-        ${Vulkan_INCLUDE_DIR}
-        ${multithreaded_job_system_INCLUDE_DIR}
         ${cglm_INCLUDE_DIR}
+        ${multithreaded_job_system_INCLUDE_DIR}
+        ${Vulkan_INCLUDE_DIR}
+        ${world_entity_INCLUDE_DIR}
 )
 
 target_link_libraries(${PROJECT_NAME}

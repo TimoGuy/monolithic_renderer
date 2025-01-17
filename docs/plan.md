@@ -38,6 +38,15 @@ On top of that basic rendering pipeline is a number of add-on effects that can b
 - Post-processing effects
 
 
-## Unaware of jobification.
+## Coordination with world entities.
 
-Important things like construction of the renderer is not thread-safe, so manual handling of atomics and/or locks will have to be done on the implementing program side. 
+- Receive updates over time from simulation job.
+    - Tick idx and the transform info (vec3 pos, quat rot, vec3 scale).
+    - Tick idx is given so that interpolation scale is known between transforms. Further away updates are given so that computation time decreases with each simulation step and timeslicing is used.
+        - @NOTE: if the buffer gets written to all the time is interpolation gonna just be turned off for far away things too then????
+    - Triple buffer transform info to ensure no need for contentious access of most recent buffer.
+- Write render information.
+    - Use 2nd and 3rd buffer info to interpolate transform if interpolation enabled.
+    - Write new transform into the rendering transform buffer.
+- Render out all the render objects.
+    - Use the transform buffer to do this.
