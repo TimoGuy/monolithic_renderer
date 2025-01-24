@@ -38,6 +38,8 @@ endif()
 add_library(${PROJECT_NAME}
     ${CMAKE_CURRENT_SOURCE_DIR}/src/renderer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/renderer.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/renderer_win64_impl.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/renderer_win64_impl.h
     # ${CMAKE_CURRENT_SOURCE_DIR}/src/example/example_main.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/vk-bootstrap/VkBootstrap.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/vk-bootstrap/VkBootstrap.h
