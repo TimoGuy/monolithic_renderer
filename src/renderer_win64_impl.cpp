@@ -13,6 +13,7 @@
 #include <cstring>
 #include <iostream>
 #include "multithreaded_job_system_public.h"
+#include "renderer_win64_vulkan_util.h"
 
 
 // Jobs.
@@ -27,14 +28,14 @@ int32_t Monolithic_renderer::Impl::Build_job::execute()
 int32_t Monolithic_renderer::Impl::Update_data_job::execute()
 {
     bool success{ true };
-    // @TODO
+    success &= m_pimpl.update_window();
     return success ? 0 : 1;
 }
 
 int32_t Monolithic_renderer::Impl::Render_job::execute()
 {
     bool success{ true };
-    // @TODO
+    success &= m_pimpl.render();
     return success ? 0 : 1;
 }
 
@@ -71,7 +72,7 @@ std::vector<Job_ifc*> Monolithic_renderer::Impl::fetch_next_jobs_callback()
             jobs = {
                 m_render_job.get(),
             };
-            m_stage = (m_shutdown_flag ? Stage::RENDER : Stage::RENDER);
+            m_stage = (m_shutdown_flag ? Stage::TEARDOWN : Stage::UPDATE_DATA);
             break;
 
         case Stage::TEARDOWN:
@@ -248,8 +249,6 @@ bool build_vulkan_renderer__build_vulkan(GLFWwindow* window,
     out_vkb_device =
         device_builder
             .add_pNext(&shader_draw_parameters_features)
-            .add_pNext(&vulkan13_features)
-            .add_pNext(&vulkan12_features)
             .build()
             .value();
     out_device = out_vkb_device.device;
@@ -298,6 +297,8 @@ bool build_vulkan_renderer__build_swapchain(VkSurfaceKHR surface,
     out_swapchain_images = swapchain.get_images().value();
     out_swapchain_image_views = swapchain.get_image_views().value();
     out_swapchain_image_format = swapchain.image_format;
+
+    return true;
 }
 
 bool build_vulkan_renderer__retrieve_queues(vkb::Device& vkb_device,
@@ -432,7 +433,8 @@ bool Monolithic_renderer::Impl::build_vulkan_renderer()
     result &= build_vulkan_renderer__build_cmd_structures(m_v_graphics_queue_family_idx,
                                                           m_v_device,
                                                           m_frames);
-    result &= build_vulkan_renderer__build_sync_structures();
+    result &= build_vulkan_renderer__build_sync_structures(m_v_device,
+                                                           m_frames);
     return result;
 }
 
@@ -450,6 +452,8 @@ bool teardown_vulkan_renderer__teardown_vulkan(VkInstance instance,
     vkb::destroy_debug_utils_messenger(instance, debug_utils_messenger);
 #endif
     vkDestroyInstance(instance, nullptr);
+
+    return true;
 }
 
 bool teardown_vulkan_renderer__teardown_allocator(VmaAllocator allocator)
@@ -485,6 +489,7 @@ bool teardown_vulkan_renderer__teardown_sync_structures()
 bool Monolithic_renderer::Impl::teardown_vulkan_renderer()
 {
     bool result{ true };
+    result &= teardown_vulkan_renderer__teardown_sync_structures();
     result &= teardown_vulkan_renderer__teardown_cmd_structures(m_v_device, m_frames);
     result &= teardown_vulkan_renderer__teardown_swapchain(m_v_device, m_v_swapchain);
     result &= teardown_vulkan_renderer__teardown_allocator(m_v_vma_allocator);
@@ -498,14 +503,16 @@ bool Monolithic_renderer::Impl::teardown_vulkan_renderer()
 }
 
 // Tick procedures.
-void Monolithic_renderer::Impl::update_window()
+bool Monolithic_renderer::Impl::update_window()
 {
     glfwPollEvents();
 
     // @TODO
+
+    return true;
 }
 
-void Monolithic_renderer::Impl::render()
+bool Monolithic_renderer::Impl::render()
 {
     VkResult err;
 
@@ -540,6 +547,7 @@ void Monolithic_renderer::Impl::render()
         std::cerr << "ERROR: Acquire next swapchain image failed." << std::endl;
         assert(false);
     }
+    auto& v_current_swapchain_image{ m_v_swapchain_images[swapchain_image_idx] };
 
     // Begin command buffer.
     VkCommandBuffer cmd{ current_frame.main_command_buffer };
@@ -561,11 +569,89 @@ void Monolithic_renderer::Impl::render()
     err = vkBeginCommandBuffer(cmd, &cmd_begin_info);
     if (err)
     {
-        std::cerr << "ERROR: Resetting command buffer failed." << std::endl;
+        std::cerr << "ERROR: Begin command buffer failed." << std::endl;
         assert(false);
     }
 
-    // @TODO: START HERE!!!!!!!
+    // Transition swapchain image for modification.
+    vk_util::transition_image(cmd,
+                              v_current_swapchain_image,
+                              VK_IMAGE_LAYOUT_UNDEFINED,
+                              VK_IMAGE_LAYOUT_GENERAL);
+    
+    // Clear image.
+    VkClearColorValue clear_value{
+        .float32{ 0.0f, 0.0f, std::abs(std::sin(m_frame_number / 120.0f)), 1.0f }
+    };
+    VkImageSubresourceRange clear_range{
+        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+        .baseMipLevel = 0,
+        .levelCount = VK_REMAINING_MIP_LEVELS,
+        .baseArrayLayer = 0,
+        .layerCount = VK_REMAINING_ARRAY_LAYERS,
+    };
+    vkCmdClearColorImage(cmd,
+                         v_current_swapchain_image,
+                         VK_IMAGE_LAYOUT_GENERAL,
+                         &clear_value,
+                         1,
+                         &clear_range);
+
+    // Transition swapchain image for presentation.
+	vk_util::transition_image(cmd,
+                              v_current_swapchain_image,
+                              VK_IMAGE_LAYOUT_GENERAL,
+                              VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+
+	// End command buffer.
+	err = vkEndCommandBuffer(cmd);
+    if (err)
+    {
+        std::cerr << "ERROR: End command buffer failed." << std::endl;
+        assert(false);
+    }
+
+    // Prep submission to the queue.
+    VkCommandBufferSubmitInfo cmd_info{ vk_util::command_buffer_submit_info(cmd) };
+    VkSemaphoreSubmitInfo wait_info{
+        vk_util::semaphore_submit_info(VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT_KHR,
+                                       current_frame.swapchain_semaphore)
+    };
+    VkSemaphoreSubmitInfo signal_info{
+        vk_util::semaphore_submit_info(VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT,
+                                       current_frame.render_semaphore)
+    };
+    VkSubmitInfo2 submit_info{ vk_util::submit_info(&cmd_info, &signal_info, &wait_info) };
+
+    // Submit command buffer to queue and execute it.
+    err = vkQueueSubmit2(m_v_graphics_queue, 1, &submit_info, current_frame.render_fence);
+    if (err)
+    {
+        std::cerr << "ERROR: Submit command buffer failed." << std::endl;
+        assert(false);
+    }
+
+    // Present image.
+    VkPresentInfoKHR present_info{
+        .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+        .pNext = nullptr,
+        .waitSemaphoreCount = 1,
+        .pWaitSemaphores = &current_frame.render_semaphore,
+        .swapchainCount = 1,
+        .pSwapchains = &m_v_swapchain,
+        .pImageIndices = &swapchain_image_idx,
+    };
+    err = vkQueuePresentKHR(m_v_graphics_queue, &present_info);
+    if (err)
+    {
+        std::cerr << "ERROR: Queue present KHR failed." << std::endl;
+        assert(false);
+    }
+
+    // End frame.
+    m_frame_number++;
+
+    return true;
 }
 
 #endif  // _WIN64

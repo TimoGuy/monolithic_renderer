@@ -7,7 +7,6 @@
 
 // @NOTE: Vulkan, VMA, and GLFW have to be included in this order.
 #include <vulkan/vulkan.h>
-#define VMA_IMPLEMENTATION
 #include <vk_mem_alloc.h>
 #include <GLFW/glfw3.h>
 
@@ -41,6 +40,8 @@ public:
         , m_window_width(content_width)
         , m_window_height(content_height)
         , m_build_job(std::make_unique<Build_job>(source, *this))
+        , m_update_data_job(std::make_unique<Update_data_job>(source, *this))
+        , m_render_job(std::make_unique<Render_job>(source, *this))
         , m_teardown_job(std::make_unique<Teardown_job>(source, *this))
     {
     }
@@ -152,8 +153,8 @@ private:
     bool teardown_vulkan_renderer();
 
     // Tick procedures.
-    void update_window();
-    void render();
+    bool update_window();
+    bool render();
 
     std::string m_name;
     int32_t m_window_width;
