@@ -263,6 +263,7 @@ bool build_vulkan_renderer__build_allocator(VkInstance instance,
 {
     // Initialize VMA.
     VmaAllocatorCreateInfo vma_allocator_info{
+        .flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT,  // To access GPU pointers.
         .physicalDevice = physical_device,
         .device = device,
         .instance = instance,
@@ -289,7 +290,11 @@ bool build_vulkan_renderer__build_swapchain(VkSurfaceKHR surface,
         swapchain_builder
             .use_default_format_selection()
             .set_desired_present_mode(VK_PRESENT_MODE_MAILBOX_KHR)  // Mailbox (G-Sync/Freesync compatible).
+            .add_fallback_present_mode(VK_PRESENT_MODE_FIFO_KHR)  // FIFO (V-Sync).
             .set_desired_extent(window_width, window_height)
+            // @TODO: TRANSFER_DST image usage added below. Try removing once renderer is finished
+            // (assuming you're not gonna have some kind of image transfer as the last step into the swapchain image).
+            .set_image_usage_flags(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT)
             .build()
             .value()
     };
@@ -470,26 +475,29 @@ bool teardown_vulkan_renderer__teardown_swapchain(VkDevice device, VkSwapchainKH
 
 bool teardown_vulkan_renderer__teardown_cmd_structures(VkDevice device, FrameData frames[])
 {
-    vkDeviceWaitIdle(device);
-
     for (uint32_t i = 0; i < k_frame_overlap; i++)
     {
         vkDestroyCommandPool(device, frames[i].command_pool, nullptr);
     }
-
     return true;
 }
 
-bool teardown_vulkan_renderer__teardown_sync_structures()
+bool teardown_vulkan_renderer__teardown_sync_structures(VkDevice device, FrameData frames[])
 {
-    // @TODO:
+    for (uint32_t i = 0; i < k_frame_overlap; i++)
+    {
+        vkDestroyFence(device, frames[i].render_fence, nullptr);
+        vkDestroySemaphore(device, frames[i].render_semaphore, nullptr);
+        vkDestroySemaphore(device, frames[i].swapchain_semaphore, nullptr);
+    }
     return true;
 }
 
 bool Monolithic_renderer::Impl::teardown_vulkan_renderer()
 {
     bool result{ true };
-    result &= teardown_vulkan_renderer__teardown_sync_structures();
+    result &= static_cast<bool>(vkDeviceWaitIdle(m_v_device));
+    result &= teardown_vulkan_renderer__teardown_sync_structures(m_v_device, m_frames);
     result &= teardown_vulkan_renderer__teardown_cmd_structures(m_v_device, m_frames);
     result &= teardown_vulkan_renderer__teardown_swapchain(m_v_device, m_v_swapchain);
     result &= teardown_vulkan_renderer__teardown_allocator(m_v_vma_allocator);
@@ -517,10 +525,10 @@ bool Monolithic_renderer::Impl::render()
     VkResult err;
 
     // Wait until GPU has finished rendering last frame.
-    constexpr uint64_t k_1sec_as_ns{ 1000000000 };
+    constexpr uint64_t k_10sec_as_ns{ 10000000000 };
     auto& current_frame{ get_current_frame() };
 
-    err = vkWaitForFences(m_v_device, 1, &current_frame.render_fence, true, k_1sec_as_ns);
+    err = vkWaitForFences(m_v_device, 1, &current_frame.render_fence, true, k_10sec_as_ns);
     if (err)
     {
         std::cerr << "ERROR: wait for render fence failed." << std::endl;
@@ -538,7 +546,7 @@ bool Monolithic_renderer::Impl::render()
     uint32_t swapchain_image_idx;
     err = vkAcquireNextImageKHR(m_v_device,
                                 m_v_swapchain,
-                                k_1sec_as_ns,
+                                k_10sec_as_ns,
                                 current_frame.swapchain_semaphore,
                                 nullptr,
                                 &swapchain_image_idx);
@@ -581,7 +589,8 @@ bool Monolithic_renderer::Impl::render()
     
     // Clear image.
     VkClearColorValue clear_value{
-        .float32{ 0.0f, 0.0f, std::abs(std::sin(m_frame_number / 120.0f)), 1.0f }
+        //.float32{ 0.0f, 0.0f, std::abs(std::sin(m_frame_number / 120.0f)), 1.0f }
+        .float32{ 0.0f, 0.0f, std::abs(0.0f), 1.0f }
     };
     VkImageSubresourceRange clear_range{
         .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
