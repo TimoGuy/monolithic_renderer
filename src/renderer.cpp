@@ -8,6 +8,8 @@
 #endif  // _WIN64, etc.
 
 
+extern std::atomic<Monolithic_renderer*> s_mr_singleton_ptr;
+
 // Implementation wrapper.
 Monolithic_renderer::Monolithic_renderer(
     const std::string& name,
@@ -15,6 +17,13 @@ Monolithic_renderer::Monolithic_renderer(
     int32_t content_height)
     : m_pimpl(std::make_unique<Impl>(name, content_width, content_height, *this))
 {
+    Monolithic_renderer* expected{ nullptr };
+    if (!s_mr_singleton_ptr.compare_exchange_strong(expected, this))
+    {
+        // Trigger assert if multiple monolithic renderers are initialized. Only
+        // one is allowed.
+        assert(false);
+    }
 }
 
 // @NOTE: For smart pointer pimpl, must define destructor
@@ -35,6 +44,13 @@ bool Monolithic_renderer::is_renderer_finished_shutdown()
 {
     return m_pimpl->is_finished_shutdown();
 }
+
+#if _WIN64
+void Monolithic_renderer::notify_windowevent_uniconification()
+{
+    m_pimpl->notify_uniconification();
+}
+#endif  // _WIN64
 
 std::vector<Job_ifc*> Monolithic_renderer::fetch_next_jobs_callback()
 {

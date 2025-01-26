@@ -27,9 +27,26 @@ struct FrameData
 
 constexpr uint32_t k_frame_overlap{ 2 };
 
+extern std::atomic<Monolithic_renderer*> s_mr_singleton_ptr;
+
 static void key_callback(GLFWwindow* window, int32_t key, int32_t scancode, int32_t action, int32_t mods)
 {
 
+}
+
+static void window_focus_callback(GLFWwindow* window, int32_t focused)
+{
+
+}
+
+static void window_iconify_callback(GLFWwindow* window, int32_t iconified)
+{
+    // Check if window was placed back and should resume rendering.
+    if (iconified == GLFW_FALSE)
+    {
+        std::cout << "NOTE: window unminimized. Resuming renderer." << std::endl;
+        s_mr_singleton_ptr.load()->notify_windowevent_uniconification();
+    }
 }
 
 class Monolithic_renderer::Impl
@@ -52,7 +69,7 @@ public:
         UPDATE_DATA,
         RENDER,
         TEARDOWN,
-        EXIT,
+        END_OF_LIFE,
     };
     std::atomic<Stage> m_stage{ Stage::BUILD };
     std::atomic_bool m_shutdown_flag{ false };
@@ -62,6 +79,11 @@ public:
     {
         update_window();
         render();
+    }
+
+    void notify_uniconification()
+    {
+        m_request_swapchain_creation = true;  // @TODO: USE THIS FLAG AND RECREATE THAT SWAPCHAINNNNNNNNNNNNNNNN
     }
 
     bool is_requesting_close()
@@ -161,6 +183,9 @@ private:
     int32_t m_window_height;
 
     GLFWwindow* m_window{ nullptr };
+    std::atomic_bool m_is_swapchain_out_of_date{ false };
+    std::atomic_bool m_request_swapchain_creation{ false };
+
     VkInstance m_v_instance{ nullptr };
 #if _DEBUG
     VkDebugUtilsMessengerEXT m_v_debug_utils_messenger{ nullptr };
@@ -184,7 +209,6 @@ private:
     {
         return m_frames[m_frame_number % k_frame_overlap];
     }
-
 };
 
 #endif  // _WIN64

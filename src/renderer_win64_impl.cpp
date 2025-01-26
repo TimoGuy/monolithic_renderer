@@ -16,6 +16,9 @@
 #include "renderer_win64_vulkan_util.h"
 
 
+// For extern symbol.
+std::atomic<Monolithic_renderer*> s_mr_singleton_ptr{ nullptr };
+
 // Jobs.
 int32_t Monolithic_renderer::Impl::Build_job::execute()
 {
@@ -44,6 +47,10 @@ int32_t Monolithic_renderer::Impl::Teardown_job::execute()
     bool success{ true };
     success &= m_pimpl.teardown_vulkan_renderer();
     success &= m_pimpl.teardown_window();
+
+    // Mark finishing shutdown.
+    m_pimpl.m_finished_shutdown = true;
+
     return success ? 0 : 1;
 }
 
@@ -72,18 +79,21 @@ std::vector<Job_ifc*> Monolithic_renderer::Impl::fetch_next_jobs_callback()
             jobs = {
                 m_render_job.get(),
             };
-            m_stage = (m_shutdown_flag ? Stage::TEARDOWN : Stage::UPDATE_DATA);
+            // @NOTE: the render job checks if a shutdown is
+            //        requested, and at that point the stage
+            //        will be set to teardown instead of update.
+            m_stage = Stage::UPDATE_DATA;
             break;
 
         case Stage::TEARDOWN:
             jobs = {
                 m_teardown_job.get(),
             };
-            m_stage = Stage::EXIT;
+            m_stage = Stage::END_OF_LIFE;
             break;
 
-        case Stage::EXIT:
-            m_finished_shutdown = true;
+        case Stage::END_OF_LIFE:
+            // Do nothing.
             break;
     }
 
@@ -112,6 +122,8 @@ bool Monolithic_renderer::Impl::build_window()
     }
 
     glfwSetKeyCallback(m_window, key_callback);
+    glfwSetWindowFocusCallback(m_window, window_focus_callback);
+    glfwSetWindowIconifyCallback(m_window, window_iconify_callback);
 
     return true;
 }
@@ -522,6 +534,10 @@ bool Monolithic_renderer::Impl::update_window()
 
 bool Monolithic_renderer::Impl::render()
 {
+    // Do not render unless window is shown.
+    if (m_is_swapchain_out_of_date)
+        return true;
+
     VkResult err;
 
     // Wait until GPU has finished rendering last frame.
@@ -531,7 +547,7 @@ bool Monolithic_renderer::Impl::render()
     err = vkWaitForFences(m_v_device, 1, &current_frame.render_fence, true, k_10sec_as_ns);
     if (err)
     {
-        std::cerr << "ERROR: wait for render fence failed." << std::endl;
+        std::cerr << "ERROR: wait for render fence timed out." << std::endl;
         assert(false);
     }
 
@@ -653,12 +669,30 @@ bool Monolithic_renderer::Impl::render()
     err = vkQueuePresentKHR(m_v_graphics_queue, &present_info);
     if (err)
     {
-        std::cerr << "ERROR: Queue present KHR failed." << std::endl;
-        assert(false);
+        // Check if swapchain is out of date when presenting, due to window
+        // being minimized or hidden.
+        // @NOTE: only a check needed for desktop apps afaik.
+        if (err == VK_ERROR_OUT_OF_DATE_KHR)
+        {
+            std::cout << "NOTE: window minimized. Pausing renderer." << std::endl;
+            m_is_swapchain_out_of_date = true;
+        }
+        else
+        {
+            std::cerr << "ERROR: Queue present KHR failed." << std::endl;
+            assert(false);
+        }
     }
 
     // End frame.
     m_frame_number++;
+
+    // Check if window should close.
+    if (is_requesting_close() || m_shutdown_flag)
+    {
+        glfwHideWindow(m_window);
+        m_stage = Stage::TEARDOWN;
+    }
 
     return true;
 }

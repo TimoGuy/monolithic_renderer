@@ -16,6 +16,10 @@ public:
     void request_shutdown_renderer();
     bool is_renderer_finished_shutdown();
 
+#if _WIN64
+    void notify_windowevent_uniconification();
+#endif  // _WIN64
+
 private:
     std::vector<Job_ifc*> fetch_next_jobs_callback() override;
 
