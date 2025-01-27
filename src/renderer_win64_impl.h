@@ -52,10 +52,17 @@ static void window_iconify_callback(GLFWwindow* window, int32_t iconified)
 class Monolithic_renderer::Impl
 {
 public:
-    Impl(const std::string& name, int32_t content_width, int32_t content_height, Job_source& source)
+    Impl(const std::string& name,
+         int32_t content_width,
+         int32_t content_height,
+         int32_t fallback_content_width,
+         int32_t fallback_content_height,
+         Job_source& source)
         : m_name(name)
         , m_window_width(content_width)
         , m_window_height(content_height)
+        , m_fallback_window_width(fallback_content_width)
+        , m_fallback_window_height(fallback_content_height)
         , m_build_job(std::make_unique<Build_job>(source, *this))
         , m_update_data_job(std::make_unique<Update_data_job>(source, *this))
         , m_render_job(std::make_unique<Render_job>(source, *this))
@@ -163,7 +170,7 @@ public:
     std::unique_ptr<Teardown_job> m_teardown_job;
 
     // Fetch next jobs.
-    std::vector<Job_ifc*> fetch_next_jobs_callback();
+    Job_next_jobs_return_data fetch_next_jobs_callback();
 
 private:
     // Win64 window setup/teardown.
@@ -181,6 +188,8 @@ private:
     std::string m_name;
     int32_t m_window_width;
     int32_t m_window_height;
+    int32_t m_fallback_window_width;
+    int32_t m_fallback_window_height;
 
     GLFWwindow* m_window{ nullptr };
     std::atomic_bool m_is_swapchain_out_of_date{ false };

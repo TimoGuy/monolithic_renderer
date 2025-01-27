@@ -14,8 +14,15 @@ extern std::atomic<Monolithic_renderer*> s_mr_singleton_ptr;
 Monolithic_renderer::Monolithic_renderer(
     const std::string& name,
     int32_t content_width,
-    int32_t content_height)
-    : m_pimpl(std::make_unique<Impl>(name, content_width, content_height, *this))
+    int32_t content_height,
+    int32_t fallback_content_width,
+    int32_t fallback_content_height)
+    : m_pimpl(std::make_unique<Impl>(name,
+                                     content_width,
+                                     content_height,
+                                     fallback_content_width,
+                                     fallback_content_height,
+                                     *this))
 {
     Monolithic_renderer* expected{ nullptr };
     if (!s_mr_singleton_ptr.compare_exchange_strong(expected, this))
@@ -52,7 +59,7 @@ void Monolithic_renderer::notify_windowevent_uniconification()
 }
 #endif  // _WIN64
 
-std::vector<Job_ifc*> Monolithic_renderer::fetch_next_jobs_callback()
+Job_source::Job_next_jobs_return_data Monolithic_renderer::fetch_next_jobs_callback()
 {
     return m_pimpl->fetch_next_jobs_callback();
 }

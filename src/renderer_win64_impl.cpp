@@ -55,28 +55,28 @@ int32_t Monolithic_renderer::Impl::Teardown_job::execute()
 }
 
 // Job source callback.
-std::vector<Job_ifc*> Monolithic_renderer::Impl::fetch_next_jobs_callback()
+Job_source::Job_next_jobs_return_data Monolithic_renderer::Impl::fetch_next_jobs_callback()
 {
-    std::vector<Job_ifc*> jobs;
+    Job_next_jobs_return_data return_data;
 
     switch (m_stage.load())
     {
         case Stage::BUILD:
-            jobs = {
+            return_data.jobs = {
                 m_build_job.get(),
             };
             m_stage = Stage::UPDATE_DATA;
             break;
 
         case Stage::UPDATE_DATA:
-            jobs = {
+            return_data.jobs = {
                 m_update_data_job.get(),
             };
             m_stage = Stage::RENDER;
             break;
 
         case Stage::RENDER:
-            jobs = {
+            return_data.jobs = {
                 m_render_job.get(),
             };
             // @NOTE: the render job checks if a shutdown is
@@ -86,18 +86,18 @@ std::vector<Job_ifc*> Monolithic_renderer::Impl::fetch_next_jobs_callback()
             break;
 
         case Stage::TEARDOWN:
-            jobs = {
+            return_data.jobs = {
                 m_teardown_job.get(),
             };
             m_stage = Stage::END_OF_LIFE;
             break;
 
         case Stage::END_OF_LIFE:
-            // Do nothing.
+            return_data.signal_end_of_life = true;
             break;
     }
 
-    return jobs;
+    return return_data;
 }
 
 // Win64 window setup/teardown.
@@ -110,6 +110,40 @@ bool Monolithic_renderer::Impl::build_window()
         return false;
     }
 
+    struct Monitor_workarea
+    {
+        int32_t xpos;
+        int32_t ypos;
+        int32_t width;
+        int32_t height;
+    } monitor_workarea;
+    glfwGetMonitorWorkarea(glfwGetPrimaryMonitor(),
+                           &monitor_workarea.xpos,
+                           &monitor_workarea.ypos,
+                           &monitor_workarea.width,
+                           &monitor_workarea.height);
+    
+    if (m_window_width >= monitor_workarea.width ||
+        m_window_height >= monitor_workarea.height)
+    {
+        // Use fallback window sizing.
+        assert(m_fallback_window_width < monitor_workarea.width);
+        assert(m_fallback_window_height < monitor_workarea.height);
+        m_window_width = m_fallback_window_width;
+        m_window_height = m_fallback_window_height;
+    }
+
+    int32_t centered_window_pos[2]{
+        monitor_workarea.xpos
+            + static_cast<int32_t>(monitor_workarea.width * 0.5
+                - m_window_width * 0.5),
+        monitor_workarea.ypos
+            + static_cast<int32_t>(monitor_workarea.height * 0.5
+                - m_window_height * 0.5),
+    };
+
+    glfwWindowHint(GLFW_POSITION_X, centered_window_pos[0]);
+    glfwWindowHint(GLFW_POSITION_Y, centered_window_pos[1]);
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);  // @TODO: Have change sizing functions (but not controllable from directly controlling the window).
 
@@ -534,6 +568,13 @@ bool Monolithic_renderer::Impl::update_window()
 
 bool Monolithic_renderer::Impl::render()
 {
+    // Recreate swapchain.
+    if (m_request_swapchain_creation)
+    {
+        std::cerr << "TODO: This would be where you recreate the swapchain. But that functionality isn't created yet. So heh haha" << std::endl;
+        // m_is_swapchain_out_of_date = false;  // @TODO: uncomment when finish the swapchain recreation.
+    }
+
     // Do not render unless window is shown.
     if (m_is_swapchain_out_of_date)
         return true;
@@ -690,7 +731,7 @@ bool Monolithic_renderer::Impl::render()
     // Check if window should close.
     if (is_requesting_close() || m_shutdown_flag)
     {
-        glfwHideWindow(m_window);
+        //glfwHideWindow(m_window);
         m_stage = Stage::TEARDOWN;
     }
 

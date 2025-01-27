@@ -9,7 +9,11 @@
 class Monolithic_renderer : public Job_source
 {
 public:
-    Monolithic_renderer(const std::string& name, int32_t content_width, int32_t content_height);
+    Monolithic_renderer(const std::string& name,
+                        int32_t content_width,
+                        int32_t content_height,
+                        int32_t fallback_content_width,
+                        int32_t fallback_content_height);
     ~Monolithic_renderer();
 
     bool is_renderer_requesting_close();
@@ -21,7 +25,7 @@ public:
 #endif  // _WIN64
 
 private:
-    std::vector<Job_ifc*> fetch_next_jobs_callback() override;
+    Job_next_jobs_return_data fetch_next_jobs_callback() override;
 
     class Impl;
     std::unique_ptr<Impl> m_pimpl;
