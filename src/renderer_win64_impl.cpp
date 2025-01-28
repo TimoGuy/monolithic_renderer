@@ -513,8 +513,12 @@ bool teardown_vulkan_renderer__teardown_allocator(VmaAllocator allocator)
     return true;
 }
 
-bool teardown_vulkan_renderer__teardown_swapchain(VkDevice device, VkSwapchainKHR swapchain)
+bool teardown_vulkan_renderer__teardown_swapchain(VkDevice device,
+                                                  VkSwapchainKHR swapchain,
+                                                  std::vector<VkImageView>& swapchain_image_views)
 {
+    for (auto image_view : swapchain_image_views)
+        vkDestroyImageView(device, image_view, nullptr);
     vkDestroySwapchainKHR(device, swapchain, nullptr);
     return true;
 }
@@ -545,7 +549,9 @@ bool Monolithic_renderer::Impl::teardown_vulkan_renderer()
     result &= static_cast<bool>(vkDeviceWaitIdle(m_v_device));
     result &= teardown_vulkan_renderer__teardown_sync_structures(m_v_device, m_frames);
     result &= teardown_vulkan_renderer__teardown_cmd_structures(m_v_device, m_frames);
-    result &= teardown_vulkan_renderer__teardown_swapchain(m_v_device, m_v_swapchain);
+    result &= teardown_vulkan_renderer__teardown_swapchain(m_v_device,
+                                                           m_v_swapchain,
+                                                           m_v_swapchain_image_views);
     result &= teardown_vulkan_renderer__teardown_allocator(m_v_vma_allocator);
     result &= teardown_vulkan_renderer__teardown_vulkan(m_v_instance,
 #if _DEBUG
@@ -646,7 +652,6 @@ bool Monolithic_renderer::Impl::render()
     
     // Clear image.
     VkClearColorValue clear_value{
-        //.float32{ 0.0f, 0.0f, std::abs(std::sin(m_frame_number / 120.0f)), 1.0f }
         .float32{ 0.0f, 0.0f, std::abs(0.0f), 1.0f }
     };
     VkImageSubresourceRange clear_range{
