@@ -1,6 +1,7 @@
-#include "renderer_win64_vulkan_util.h"
+#include "renderer_win64_vk_util.h"
 
 
+// Submission.
 void vk_util::transition_image(VkCommandBuffer cmd,
                                VkImage image,
                                VkImageLayout current_layout,
@@ -83,6 +84,47 @@ VkSubmitInfo2 vk_util::submit_info(VkCommandBufferSubmitInfo* cmd,
         .pCommandBufferInfos = cmd,
         .signalSemaphoreInfoCount = (signal_semaphore_info == nullptr) ? 0u : 1u,
         .pSignalSemaphoreInfos = signal_semaphore_info,
+    };
+    return info;
+}
+
+// Image.
+VkImageCreateInfo vk_util::image_create_info(VkFormat format,
+                                             VkImageUsageFlags usage_flags,
+                                             VkExtent3D extent)
+{
+    VkImageCreateInfo info{
+        .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+        .pNext = nullptr,
+        .imageType = VK_IMAGE_TYPE_2D,
+        .format = format,
+        .extent = extent,
+        .mipLevels = 1,
+        .arrayLayers = 1,
+        .samples = VK_SAMPLE_COUNT_1_BIT,  // @NOTE: for MSAA.
+        .tiling = VK_IMAGE_TILING_OPTIMAL,
+        .usage = usage_flags,
+    };
+    return info;
+}
+
+VkImageViewCreateInfo vk_util::image_view_create_info(VkFormat format,
+                                                      VkImage image,
+                                                      VkImageAspectFlags aspect_flags)
+{
+    VkImageViewCreateInfo info{
+        .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+        .pNext = nullptr,
+        .image = image,
+        .viewType = VK_IMAGE_VIEW_TYPE_2D,
+        .format = format,
+        .subresourceRange{
+            .aspectMask = aspect_flags,
+            .baseMipLevel = 0,
+            .levelCount = 1,
+            .baseArrayLayer = 0,
+            .layerCount = 1,
+        },
     };
     return info;
 }

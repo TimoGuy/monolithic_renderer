@@ -474,10 +474,10 @@ bool Monolithic_renderer::Impl::build_vulkan_renderer()
                                                      m_v_device,
                                                      m_window_width,
                                                      m_window_height,
-                                                     m_v_swapchain,
-                                                     m_v_swapchain_images,
-                                                     m_v_swapchain_image_views,
-                                                     m_v_swapchain_image_format);
+                                                     m_v_swapchain.swapchain,
+                                                     m_v_swapchain.images,
+                                                     m_v_swapchain.image_views,
+                                                     m_v_swapchain.image_format);
     result &= build_vulkan_renderer__retrieve_queues(vkb_device,
                                                      m_v_graphics_queue,
                                                      m_v_graphics_queue_family_idx);
@@ -550,8 +550,8 @@ bool Monolithic_renderer::Impl::teardown_vulkan_renderer()
     result &= teardown_vulkan_renderer__teardown_sync_structures(m_v_device, m_frames);
     result &= teardown_vulkan_renderer__teardown_cmd_structures(m_v_device, m_frames);
     result &= teardown_vulkan_renderer__teardown_swapchain(m_v_device,
-                                                           m_v_swapchain,
-                                                           m_v_swapchain_image_views);
+                                                           m_v_swapchain.swapchain,
+                                                           m_v_swapchain.image_views);
     result &= teardown_vulkan_renderer__teardown_allocator(m_v_vma_allocator);
     result &= teardown_vulkan_renderer__teardown_vulkan(m_v_instance,
 #if _DEBUG
@@ -608,7 +608,7 @@ bool Monolithic_renderer::Impl::render()
     // Request image from swapchain.
     uint32_t swapchain_image_idx;
     err = vkAcquireNextImageKHR(m_v_device,
-                                m_v_swapchain,
+                                m_v_swapchain.swapchain,
                                 k_10sec_as_ns,
                                 current_frame.swapchain_semaphore,
                                 nullptr,
@@ -618,7 +618,7 @@ bool Monolithic_renderer::Impl::render()
         std::cerr << "ERROR: Acquire next swapchain image failed." << std::endl;
         assert(false);
     }
-    auto& v_current_swapchain_image{ m_v_swapchain_images[swapchain_image_idx] };
+    auto& v_current_swapchain_image{ m_v_swapchain.images[swapchain_image_idx] };
 
     // Begin command buffer.
     VkCommandBuffer cmd{ current_frame.main_command_buffer };
@@ -709,7 +709,7 @@ bool Monolithic_renderer::Impl::render()
         .waitSemaphoreCount = 1,
         .pWaitSemaphores = &current_frame.render_semaphore,
         .swapchainCount = 1,
-        .pSwapchains = &m_v_swapchain,
+        .pSwapchains = &m_v_swapchain.swapchain,
         .pImageIndices = &swapchain_image_idx,
     };
     err = vkQueuePresentKHR(m_v_graphics_queue, &present_info);

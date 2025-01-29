@@ -5,15 +5,16 @@
 
 #include "renderer.h"
 
-// @NOTE: Vulkan, VMA, and GLFW have to be included in this order.
+// @NOTE: Vulkan, VMA, GLFW, VkBootstrap have to be included in this order.
 #include <vulkan/vulkan.h>
 #include <vk_mem_alloc.h>
 #include <GLFW/glfw3.h>
+#include "VkBootstrap.h"
 
 #include <cinttypes>
 #include <cstring>
 #include <iostream>
-#include "VkBootstrap.h"
+#include "renderer_win64_vk_image.h"
 
 
 struct FrameData
@@ -190,8 +191,8 @@ private:
     int32_t m_window_height;
     int32_t m_fallback_window_width;
     int32_t m_fallback_window_height;
-
     GLFWwindow* m_window{ nullptr };
+
     std::atomic_bool m_is_swapchain_out_of_date{ false };
     std::atomic_bool m_request_swapchain_creation{ false };
 
@@ -206,10 +207,20 @@ private:
     VkQueue m_v_graphics_queue{ nullptr };
     uint32_t m_v_graphics_queue_family_idx;
     VmaAllocator m_v_vma_allocator{ nullptr };
-    VkSwapchainKHR m_v_swapchain{ nullptr };
-    std::vector<VkImage> m_v_swapchain_images;
-    std::vector<VkImageView> m_v_swapchain_image_views;
-    VkFormat m_v_swapchain_image_format;
+
+    struct Swapchain
+    {
+        VkSwapchainKHR swapchain{ nullptr };
+        std::vector<VkImage> images;
+        std::vector<VkImageView> image_views;
+        VkFormat image_format;
+    } m_v_swapchain;
+
+    struct HDR_draw_image
+    {
+        vk_image::AllocatedImage image;
+        VkExtent2D               extent;
+    } m_v_HDR_draw_image;
 
     FrameData m_frames[k_frame_overlap];
     std::atomic_size_t m_frame_number{ 0 };
