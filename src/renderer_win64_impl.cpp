@@ -13,7 +13,7 @@
 #include <cstring>
 #include <iostream>
 #include "multithreaded_job_system_public.h"
-#include "renderer_win64_vulkan_util.h"
+#include "renderer_win64_vk_util.h"
 
 
 // For extern symbol.
@@ -170,16 +170,16 @@ bool Monolithic_renderer::Impl::teardown_window()
 }
 
 // Vulkan renderer setup/teardown.
-bool build_vulkan_renderer__build_vulkan(GLFWwindow* window,
-                                         VkInstance& out_instance,
+bool build_vulkan_renderer__vulkan(GLFWwindow* window,
+                                   VkInstance& out_instance,
 #if _DEBUG
-                                         VkDebugUtilsMessengerEXT& out_debug_utils_messenger,
+                                   VkDebugUtilsMessengerEXT& out_debug_utils_messenger,
 #endif
-                                         VkSurfaceKHR& out_surface,
-                                         VkPhysicalDevice& out_physical_device,
-                                         VkPhysicalDeviceProperties& out_physical_device_properties,
-                                         VkDevice& out_device,
-                                         vkb::Device& out_vkb_device)
+                                   VkSurfaceKHR& out_surface,
+                                   VkPhysicalDevice& out_physical_device,
+                                   VkPhysicalDeviceProperties& out_physical_device_properties,
+                                   VkDevice& out_device,
+                                   vkb::Device& out_vkb_device)
 {
     VkResult err;
 
@@ -302,10 +302,10 @@ bool build_vulkan_renderer__build_vulkan(GLFWwindow* window,
     return true;
 }
 
-bool build_vulkan_renderer__build_allocator(VkInstance instance,
-                                            VkPhysicalDevice physical_device,
-                                            VkDevice device,
-                                            VmaAllocator& out_allocator)
+bool build_vulkan_renderer__allocator(VkInstance instance,
+                                      VkPhysicalDevice physical_device,
+                                      VkDevice device,
+                                      VmaAllocator& out_allocator)
 {
     // Initialize VMA.
     VmaAllocatorCreateInfo vma_allocator_info{
@@ -319,15 +319,16 @@ bool build_vulkan_renderer__build_allocator(VkInstance instance,
     return true;
 }
 
-bool build_vulkan_renderer__build_swapchain(VkSurfaceKHR surface,
-                                            VkPhysicalDevice physical_device,
-                                            VkDevice device,
-                                            int32_t window_width,
-                                            int32_t window_height,
-                                            VkSwapchainKHR& out_swapchain,
-                                            std::vector<VkImage>& out_swapchain_images,
-                                            std::vector<VkImageView>& out_swapchain_image_views,
-                                            VkFormat& out_swapchain_image_format)
+bool build_vulkan_renderer__swapchain(VkSurfaceKHR surface,
+                                      VkPhysicalDevice physical_device,
+                                      VkDevice device,
+                                      int32_t window_width,
+                                      int32_t window_height,
+                                      VkSwapchainKHR& out_swapchain,
+                                      std::vector<VkImage>& out_swapchain_images,
+                                      std::vector<VkImageView>& out_swapchain_image_views,
+                                      VkFormat& out_swapchain_image_format,
+                                      VkExtent2D& out_swapchain_extent)
 {
     // Build swapchain.
     // @TODO: Make swapchain rebuilding a thing.
@@ -348,6 +349,70 @@ bool build_vulkan_renderer__build_swapchain(VkSurfaceKHR surface,
     out_swapchain_images = swapchain.get_images().value();
     out_swapchain_image_views = swapchain.get_image_views().value();
     out_swapchain_image_format = swapchain.image_format;
+    out_swapchain_extent.width = window_width;
+    out_swapchain_extent.height = window_height;
+
+    return true;
+}
+
+bool build_vulkan_renderer__hdr_image(VmaAllocator allocator,
+                                      VkDevice device,
+                                      int32_t window_width,
+                                      int32_t window_height,
+                                      vk_image::AllocatedImage& out_hdr_image,
+                                      VkExtent2D& out_hdr_image_extent)
+{
+    // Create HDR draw image.
+    VkExtent3D extent{
+        window_width,
+        window_height,
+        1
+    };
+
+    out_hdr_image.image_format = VK_FORMAT_R16G16B16A16_SFLOAT;
+    out_hdr_image.image_extent = extent;
+
+    VkImageUsageFlags usages{};
+    usages |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT
+              | VK_IMAGE_USAGE_TRANSFER_DST_BIT
+              | VK_IMAGE_USAGE_STORAGE_BIT
+              | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
+    VkImageCreateInfo image_info{
+        vk_util::image_create_info(out_hdr_image.image_format,
+                                   usages,
+                                   extent)
+    };
+
+    VmaAllocationCreateInfo image_alloc_info{
+        .usage = VMA_MEMORY_USAGE_GPU_ONLY,
+        .requiredFlags = VkMemoryPropertyFlags{ VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT },
+    };
+    vmaCreateImage(allocator,
+                   &image_info,
+                   &image_alloc_info,
+                   &out_hdr_image.image,
+                   &out_hdr_image.allocation,
+                   nullptr);
+
+	VkImageViewCreateInfo image_view_info{
+        vk_util::image_view_create_info(out_hdr_image.image_format,
+                                        out_hdr_image.image,
+                                        VK_IMAGE_ASPECT_COLOR_BIT)
+    };
+
+    VkResult err{
+        vkCreateImageView(device, &image_view_info, nullptr, &out_hdr_image.image_view)
+    };
+    if (err)
+    {
+        std::cerr << "ERROR: Create `hdr_image` image view failed." << std::endl;
+        assert(false);
+    }
+
+    // Set 2D extent.
+    out_hdr_image_extent.width = out_hdr_image.image_extent.width;
+    out_hdr_image_extent.height = out_hdr_image.image_extent.height;
 
     return true;
 }
@@ -364,9 +429,9 @@ bool build_vulkan_renderer__retrieve_queues(vkb::Device& vkb_device,
     return true;
 }
 
-bool build_vulkan_renderer__build_cmd_structures(uint32_t m_v_graphics_queue_family_idx,
-                                                 VkDevice m_v_device,
-                                                 FrameData out_frames[])
+bool build_vulkan_renderer__cmd_structures(uint32_t graphics_queue_family_idx,
+                                           VkDevice device,
+                                           FrameData out_frames[])
 {
     VkResult err;
 
@@ -374,12 +439,12 @@ bool build_vulkan_renderer__build_cmd_structures(uint32_t m_v_graphics_queue_fam
         .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
         .pNext = nullptr,
         .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-        .queueFamilyIndex = m_v_graphics_queue_family_idx
+        .queueFamilyIndex = graphics_queue_family_idx
     };
 
     for (uint32_t i = 0; i < k_frame_overlap; i++)
     {
-        err = vkCreateCommandPool(m_v_device, &cmd_pool_info, nullptr, &out_frames[i].command_pool);
+        err = vkCreateCommandPool(device, &cmd_pool_info, nullptr, &out_frames[i].command_pool);
         if (err)
         {
             std::cerr << "ERROR: Vulkan command pool creation failed for frame #" << i << std::endl;
@@ -395,7 +460,7 @@ bool build_vulkan_renderer__build_cmd_structures(uint32_t m_v_graphics_queue_fam
             .commandBufferCount = 1,
         };
 
-        err = vkAllocateCommandBuffers(m_v_device, &cmd_alloc_info, &out_frames[i].main_command_buffer);
+        err = vkAllocateCommandBuffers(device, &cmd_alloc_info, &out_frames[i].main_command_buffer);
         if (err)
         {
             std::cerr << "ERROR: Vulkan command pool allocation failed for frame #" << i << std::endl;
@@ -406,7 +471,7 @@ bool build_vulkan_renderer__build_cmd_structures(uint32_t m_v_graphics_queue_fam
     return true;
 }
 
-bool build_vulkan_renderer__build_sync_structures(VkDevice device, FrameData out_frames[])
+bool build_vulkan_renderer__sync_structures(VkDevice device, FrameData out_frames[])
 {
     VkResult err;
 
@@ -455,46 +520,53 @@ bool Monolithic_renderer::Impl::build_vulkan_renderer()
 {
     bool result{ true };
     vkb::Device vkb_device;
-    result &= build_vulkan_renderer__build_vulkan(m_window,
-                                                  m_v_instance,
+    result &= build_vulkan_renderer__vulkan(m_window,
+                                            m_v_instance,
 #if _DEBUG
-                                                  m_v_debug_utils_messenger,
+                                            m_v_debug_utils_messenger,
 #endif
-                                                  m_v_surface,
-                                                  m_v_physical_device,
-                                                  m_v_physical_device_properties,
-                                                  m_v_device,
-                                                  vkb_device);
-    result &= build_vulkan_renderer__build_allocator(m_v_instance,
-                                                     m_v_physical_device,
-                                                     m_v_device,
-                                                     m_v_vma_allocator);
-    result &= build_vulkan_renderer__build_swapchain(m_v_surface,
-                                                     m_v_physical_device,
-                                                     m_v_device,
-                                                     m_window_width,
-                                                     m_window_height,
-                                                     m_v_swapchain.swapchain,
-                                                     m_v_swapchain.images,
-                                                     m_v_swapchain.image_views,
-                                                     m_v_swapchain.image_format);
+                                            m_v_surface,
+                                            m_v_physical_device,
+                                            m_v_physical_device_properties,
+                                            m_v_device,
+                                            vkb_device);
+    result &= build_vulkan_renderer__allocator(m_v_instance,
+                                               m_v_physical_device,
+                                               m_v_device,
+                                               m_v_vma_allocator);
+    result &= build_vulkan_renderer__swapchain(m_v_surface,
+                                               m_v_physical_device,
+                                               m_v_device,
+                                               m_window_width,
+                                               m_window_height,
+                                               m_v_swapchain.swapchain,
+                                               m_v_swapchain.images,
+                                               m_v_swapchain.image_views,
+                                               m_v_swapchain.image_format,
+                                               m_v_swapchain.extent);
+    result &= build_vulkan_renderer__hdr_image(m_v_vma_allocator,
+                                               m_v_device,
+                                               m_window_width,
+                                               m_window_height,
+                                               m_v_HDR_draw_image.image,
+                                               m_v_HDR_draw_image.extent);
     result &= build_vulkan_renderer__retrieve_queues(vkb_device,
                                                      m_v_graphics_queue,
                                                      m_v_graphics_queue_family_idx);
-    result &= build_vulkan_renderer__build_cmd_structures(m_v_graphics_queue_family_idx,
-                                                          m_v_device,
-                                                          m_frames);
-    result &= build_vulkan_renderer__build_sync_structures(m_v_device,
-                                                           m_frames);
+    result &= build_vulkan_renderer__cmd_structures(m_v_graphics_queue_family_idx,
+                                                    m_v_device,
+                                                    m_frames);
+    result &= build_vulkan_renderer__sync_structures(m_v_device,
+                                                     m_frames);
     return result;
 }
 
-bool teardown_vulkan_renderer__teardown_vulkan(VkInstance instance,
+bool teardown_vulkan_renderer__vulkan(VkInstance instance,
 #if _DEBUG
-                                               VkDebugUtilsMessengerEXT debug_utils_messenger,
+                                      VkDebugUtilsMessengerEXT debug_utils_messenger,
 #endif
-                                               VkSurfaceKHR surface,
-                                               VkDevice device)
+                                      VkSurfaceKHR surface,
+                                      VkDevice device)
 {
     vkDestroyDevice(device, nullptr);
     // @NOTE: Vulkan surface created from GLFW must be destroyed with vk func.
@@ -507,15 +579,15 @@ bool teardown_vulkan_renderer__teardown_vulkan(VkInstance instance,
     return true;
 }
 
-bool teardown_vulkan_renderer__teardown_allocator(VmaAllocator allocator)
+bool teardown_vulkan_renderer__allocator(VmaAllocator allocator)
 {
     vmaDestroyAllocator(allocator);
     return true;
 }
 
-bool teardown_vulkan_renderer__teardown_swapchain(VkDevice device,
-                                                  VkSwapchainKHR swapchain,
-                                                  std::vector<VkImageView>& swapchain_image_views)
+bool teardown_vulkan_renderer__swapchain(VkDevice device,
+                                         VkSwapchainKHR swapchain,
+                                         std::vector<VkImageView>& swapchain_image_views)
 {
     for (auto image_view : swapchain_image_views)
         vkDestroyImageView(device, image_view, nullptr);
@@ -523,7 +595,16 @@ bool teardown_vulkan_renderer__teardown_swapchain(VkDevice device,
     return true;
 }
 
-bool teardown_vulkan_renderer__teardown_cmd_structures(VkDevice device, FrameData frames[])
+bool teardown_vulkan_renderer__hdr_image(VmaAllocator allocator,
+                                         VkDevice device,
+                                         const vk_image::AllocatedImage& hdr_image)
+{
+    vkDestroyImageView(device, hdr_image.image_view, nullptr);
+    vmaDestroyImage(allocator, hdr_image.image, hdr_image.allocation);
+    return true;
+}
+
+bool teardown_vulkan_renderer__cmd_structures(VkDevice device, FrameData frames[])
 {
     for (uint32_t i = 0; i < k_frame_overlap; i++)
     {
@@ -532,7 +613,7 @@ bool teardown_vulkan_renderer__teardown_cmd_structures(VkDevice device, FrameDat
     return true;
 }
 
-bool teardown_vulkan_renderer__teardown_sync_structures(VkDevice device, FrameData frames[])
+bool teardown_vulkan_renderer__sync_structures(VkDevice device, FrameData frames[])
 {
     for (uint32_t i = 0; i < k_frame_overlap; i++)
     {
@@ -547,18 +628,21 @@ bool Monolithic_renderer::Impl::teardown_vulkan_renderer()
 {
     bool result{ true };
     result &= static_cast<bool>(vkDeviceWaitIdle(m_v_device));
-    result &= teardown_vulkan_renderer__teardown_sync_structures(m_v_device, m_frames);
-    result &= teardown_vulkan_renderer__teardown_cmd_structures(m_v_device, m_frames);
-    result &= teardown_vulkan_renderer__teardown_swapchain(m_v_device,
-                                                           m_v_swapchain.swapchain,
-                                                           m_v_swapchain.image_views);
-    result &= teardown_vulkan_renderer__teardown_allocator(m_v_vma_allocator);
-    result &= teardown_vulkan_renderer__teardown_vulkan(m_v_instance,
+    result &= teardown_vulkan_renderer__sync_structures(m_v_device, m_frames);
+    result &= teardown_vulkan_renderer__cmd_structures(m_v_device, m_frames);
+    result &= teardown_vulkan_renderer__hdr_image(m_v_vma_allocator,
+                                                  m_v_device,
+                                                  m_v_HDR_draw_image.image);
+    result &= teardown_vulkan_renderer__swapchain(m_v_device,
+                                                  m_v_swapchain.swapchain,
+                                                  m_v_swapchain.image_views);
+    result &= teardown_vulkan_renderer__allocator(m_v_vma_allocator);
+    result &= teardown_vulkan_renderer__vulkan(m_v_instance,
 #if _DEBUG
-                                                        m_v_debug_utils_messenger,
+                                               m_v_debug_utils_messenger,
 #endif
-                                                        m_v_surface,
-                                                        m_v_device);
+                                               m_v_surface,
+                                               m_v_device);
     return result;
 }
 
@@ -572,33 +656,24 @@ bool Monolithic_renderer::Impl::update_window()
     return true;
 }
 
-bool Monolithic_renderer::Impl::render()
+void render__wait_until_current_frame_is_ready_to_render(VkDevice device,
+                                                         VkSwapchainKHR swapchain,
+                                                         const FrameData& current_frame,
+                                                         uint32_t& out_swapchain_image_idx)
 {
-    // Recreate swapchain.
-    if (m_request_swapchain_creation)
-    {
-        std::cerr << "TODO: This would be where you recreate the swapchain. But that functionality isn't created yet. So heh haha" << std::endl;
-        // m_is_swapchain_out_of_date = false;  // @TODO: uncomment when finish the swapchain recreation.
-    }
-
-    // Do not render unless window is shown.
-    if (m_is_swapchain_out_of_date)
-        return true;
-
     VkResult err;
 
     // Wait until GPU has finished rendering last frame.
     constexpr uint64_t k_10sec_as_ns{ 10000000000 };
-    auto& current_frame{ get_current_frame() };
 
-    err = vkWaitForFences(m_v_device, 1, &current_frame.render_fence, true, k_10sec_as_ns);
+    err = vkWaitForFences(device, 1, &current_frame.render_fence, true, k_10sec_as_ns);
     if (err)
     {
         std::cerr << "ERROR: wait for render fence timed out." << std::endl;
         assert(false);
     }
 
-    err = vkResetFences(m_v_device, 1, &current_frame.render_fence);
+    err = vkResetFences(device, 1, &current_frame.render_fence);
     if (err)
     {
         std::cerr << "ERROR: reset render fence failed." << std::endl;
@@ -606,24 +681,23 @@ bool Monolithic_renderer::Impl::render()
     }
 
     // Request image from swapchain.
-    uint32_t swapchain_image_idx;
-    err = vkAcquireNextImageKHR(m_v_device,
-                                m_v_swapchain.swapchain,
+    err = vkAcquireNextImageKHR(device,
+                                swapchain,
                                 k_10sec_as_ns,
                                 current_frame.swapchain_semaphore,
                                 nullptr,
-                                &swapchain_image_idx);
+                                &out_swapchain_image_idx);
     if (err)
     {
         std::cerr << "ERROR: Acquire next swapchain image failed." << std::endl;
         assert(false);
     }
-    auto& v_current_swapchain_image{ m_v_swapchain.images[swapchain_image_idx] };
+}
 
-    // Begin command buffer.
-    VkCommandBuffer cmd{ current_frame.main_command_buffer };
+void render__begin_command_buffer(VkCommandBuffer cmd)
+{
 
-    err = vkResetCommandBuffer(cmd, 0);
+    VkResult err{ vkResetCommandBuffer(cmd, 0) };
     if (err)
     {
         std::cerr << "ERROR: Resetting command buffer failed." << std::endl;
@@ -643,16 +717,13 @@ bool Monolithic_renderer::Impl::render()
         std::cerr << "ERROR: Begin command buffer failed." << std::endl;
         assert(false);
     }
+}
 
-    // Transition swapchain image for modification.
-    vk_util::transition_image(cmd,
-                              v_current_swapchain_image,
-                              VK_IMAGE_LAYOUT_UNDEFINED,
-                              VK_IMAGE_LAYOUT_GENERAL);
-    
-    // Clear image.
+void render__clear_background(VkCommandBuffer cmd,
+                              const vk_image::AllocatedImage& hdr_image)
+{
     VkClearColorValue clear_value{
-        .float32{ 0.0f, 0.0f, std::abs(0.0f), 1.0f }
+        .float32{ 0.0f, 0.5f, 0.1f, 1.0f }
     };
     VkImageSubresourceRange clear_range{
         .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
@@ -662,26 +733,55 @@ bool Monolithic_renderer::Impl::render()
         .layerCount = VK_REMAINING_ARRAY_LAYERS,
     };
     vkCmdClearColorImage(cmd,
-                         v_current_swapchain_image,
+                         hdr_image.image,
                          VK_IMAGE_LAYOUT_GENERAL,
                          &clear_value,
                          1,
                          &clear_range);
+}
 
+void render__blit_HDR_image_to_swapchain(VkCommandBuffer cmd,
+                                         VkImage hdr_image,
+                                         VkExtent2D hdr_image_extent,
+                                         VkImage swapchain_image,
+                                         VkExtent2D swapchain_extent)
+{
     // Transition swapchain image for presentation.
-	vk_util::transition_image(cmd,
-                              v_current_swapchain_image,
+    vk_util::transition_image(cmd,
+                              hdr_image,
                               VK_IMAGE_LAYOUT_GENERAL,
+                              VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+	vk_util::transition_image(cmd,
+                              swapchain_image,
+                              VK_IMAGE_LAYOUT_UNDEFINED,
+                              VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    vk_util::blit_image_to_image(cmd,
+                                 hdr_image,
+                                 swapchain_image,
+                                 hdr_image_extent,
+                                 swapchain_extent,
+                                 VK_FILTER_NEAREST);
+	vk_util::transition_image(cmd,
+                              swapchain_image,
+                              VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                               VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+}
 
-	// End command buffer.
-	err = vkEndCommandBuffer(cmd);
+void render__end_command_buffer(VkCommandBuffer cmd)
+{
+    // End command buffer.
+	VkResult err{ vkEndCommandBuffer(cmd) };
     if (err)
     {
         std::cerr << "ERROR: End command buffer failed." << std::endl;
         assert(false);
     }
+}
 
+void render__submit_commands_to_queue(VkCommandBuffer cmd,
+                                      VkQueue graphics_queue,
+                                      FrameData& current_frame)
+{
     // Prep submission to the queue.
     VkCommandBufferSubmitInfo cmd_info{ vk_util::command_buffer_submit_info(cmd) };
     VkSemaphoreSubmitInfo wait_info{
@@ -695,13 +795,22 @@ bool Monolithic_renderer::Impl::render()
     VkSubmitInfo2 submit_info{ vk_util::submit_info(&cmd_info, &signal_info, &wait_info) };
 
     // Submit command buffer to queue and execute it.
-    err = vkQueueSubmit2(m_v_graphics_queue, 1, &submit_info, current_frame.render_fence);
+    VkResult err{
+        vkQueueSubmit2(graphics_queue, 1, &submit_info, current_frame.render_fence)
+    };
     if (err)
     {
         std::cerr << "ERROR: Submit command buffer failed." << std::endl;
         assert(false);
     }
+}
 
+void render__present_image(VkSwapchainKHR swapchain,
+                           VkQueue graphics_queue,
+                           const uint32_t& swapchain_image_idx,
+                           const FrameData& current_frame,
+                           std::atomic_bool& out_is_swapchain_out_of_date)
+{
     // Present image.
     VkPresentInfoKHR present_info{
         .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
@@ -709,10 +818,11 @@ bool Monolithic_renderer::Impl::render()
         .waitSemaphoreCount = 1,
         .pWaitSemaphores = &current_frame.render_semaphore,
         .swapchainCount = 1,
-        .pSwapchains = &m_v_swapchain.swapchain,
+        .pSwapchains = &swapchain,
         .pImageIndices = &swapchain_image_idx,
     };
-    err = vkQueuePresentKHR(m_v_graphics_queue, &present_info);
+    VkResult err{
+        vkQueuePresentKHR(graphics_queue, &present_info) };
     if (err)
     {
         // Check if swapchain is out of date when presenting, due to window
@@ -721,7 +831,7 @@ bool Monolithic_renderer::Impl::render()
         if (err == VK_ERROR_OUT_OF_DATE_KHR)
         {
             std::cout << "NOTE: window minimized. Pausing renderer." << std::endl;
-            m_is_swapchain_out_of_date = true;
+            out_is_swapchain_out_of_date = true;
         }
         else
         {
@@ -729,6 +839,57 @@ bool Monolithic_renderer::Impl::render()
             assert(false);
         }
     }
+}
+
+bool Monolithic_renderer::Impl::render()
+{
+    // Recreate swapchain.
+    if (m_request_swapchain_creation)
+    {
+        std::cerr << "TODO: This would be where you recreate the swapchain. But that functionality isn't created yet. So heh haha" << std::endl;
+        // m_is_swapchain_out_of_date = false;  // @TODO: uncomment when finish the swapchain recreation.
+    }
+
+    // Do not render unless window is shown.
+    if (m_is_swapchain_out_of_date)
+        return true;
+
+    // Ready command buffer and swapchain for this frame.
+    auto& current_frame{ get_current_frame() };
+    uint32_t swapchain_image_idx;
+    render__wait_until_current_frame_is_ready_to_render(m_v_device,
+                                                        m_v_swapchain.swapchain,
+                                                        current_frame,
+                                                        swapchain_image_idx);
+    auto& v_current_swapchain_image{ m_v_swapchain.images[swapchain_image_idx] };
+
+    // Write commands.
+    VkCommandBuffer cmd{ current_frame.main_command_buffer };
+    render__begin_command_buffer(cmd);
+
+    vk_util::transition_image(cmd,
+                              m_v_HDR_draw_image.image.image,
+                              VK_IMAGE_LAYOUT_UNDEFINED,
+                              VK_IMAGE_LAYOUT_GENERAL);
+
+    render__clear_background(cmd, m_v_HDR_draw_image.image);
+
+    render__blit_HDR_image_to_swapchain(cmd,
+                                        m_v_HDR_draw_image.image.image,
+                                        m_v_HDR_draw_image.extent,
+                                        v_current_swapchain_image,
+                                        m_v_swapchain.extent);
+	render__end_command_buffer(cmd);
+
+    // Finish frame.
+    render__submit_commands_to_queue(cmd,
+                                     m_v_graphics_queue,
+                                     current_frame);
+    render__present_image(m_v_swapchain.swapchain,
+                          m_v_graphics_queue,
+                          swapchain_image_idx,
+                          current_frame,
+                          m_is_swapchain_out_of_date);
 
     // End frame.
     m_frame_number++;

@@ -214,6 +214,7 @@ private:
         std::vector<VkImage> images;
         std::vector<VkImageView> image_views;
         VkFormat image_format;
+        VkExtent2D extent;
     } m_v_swapchain;
 
     struct HDR_draw_image
