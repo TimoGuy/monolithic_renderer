@@ -719,6 +719,15 @@ void render__begin_command_buffer(VkCommandBuffer cmd)
     }
 }
 
+void render__prep_HDR_image_for_rendering(VkCommandBuffer cmd,
+                                          VkImage hdr_image)
+{
+    vk_util::transition_image(cmd,
+                              hdr_image,
+                              VK_IMAGE_LAYOUT_UNDEFINED,
+                              VK_IMAGE_LAYOUT_GENERAL);
+}
+
 void render__clear_background(VkCommandBuffer cmd,
                               const vk_image::AllocatedImage& hdr_image)
 {
@@ -867,10 +876,7 @@ bool Monolithic_renderer::Impl::render()
     VkCommandBuffer cmd{ current_frame.main_command_buffer };
     render__begin_command_buffer(cmd);
 
-    vk_util::transition_image(cmd,
-                              m_v_HDR_draw_image.image.image,
-                              VK_IMAGE_LAYOUT_UNDEFINED,
-                              VK_IMAGE_LAYOUT_GENERAL);
+    render__prep_HDR_image_for_rendering(cmd, m_v_HDR_draw_image.image.image);
 
     render__clear_background(cmd, m_v_HDR_draw_image.image);
 
