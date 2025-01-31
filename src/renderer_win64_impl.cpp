@@ -13,6 +13,7 @@
 #include <cstring>
 #include <iostream>
 #include "multithreaded_job_system_public.h"
+#include "renderer_win64_vk_pipeline.h"
 #include "renderer_win64_vk_util.h"
 
 
@@ -364,8 +365,8 @@ bool build_vulkan_renderer__hdr_image(VmaAllocator allocator,
 {
     // Create HDR draw image.
     VkExtent3D extent{
-        window_width,
-        window_height,
+        static_cast<uint32_t>(window_width),
+        static_cast<uint32_t>(window_height),
         1
     };
 
@@ -516,6 +517,105 @@ bool build_vulkan_renderer__sync_structures(VkDevice device, FrameData out_frame
     return true;
 }
 
+bool build_vulkan_renderer__descriptors(VkDevice device,
+                                        VkImageView hdr_image_view,
+                                        vk_desc::Descriptor_allocator& out_descriptor_alloc,
+                                        VkDescriptorSetLayout& out_descriptor_layout,
+                                        VkDescriptorSet& out_descriptor_set)
+{
+    // Init allocator pool.
+    std::vector<vk_desc::Descriptor_allocator::Pool_size_ratio> sizes{
+        { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1 },
+    };
+
+    out_descriptor_alloc.init_pool(device, 10, sizes);
+
+    // Build layout.
+    vk_desc::Descriptor_layout_builder builder;
+    builder.add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+    out_descriptor_layout = builder.build(device, VK_SHADER_STAGE_COMPUTE_BIT);
+
+    // Allocate descriptor set.
+    out_descriptor_set = out_descriptor_alloc.allocate(device, out_descriptor_layout);
+
+    VkDescriptorImageInfo image_info{
+        .imageView = hdr_image_view,
+        .imageLayout = VK_IMAGE_LAYOUT_GENERAL,
+    };
+
+    VkWriteDescriptorSet image_write{
+        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+        .pNext = nullptr,
+        .dstSet = out_descriptor_set,
+        .dstBinding = 0,
+        .descriptorCount = 1,
+        .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+        .pImageInfo = &image_info,
+    };
+
+    vkUpdateDescriptorSets(device, 1, &image_write, 0, nullptr);
+
+    return true;
+}
+
+bool build_vulkan_renderer__pipelines(VkDevice device,
+                                      VkDescriptorSetLayout descriptor_layout,
+                                      VkPipelineLayout& out_pipeline_layout,
+                                      VkPipeline& out_pipeline)
+{
+    // Create pipeline layout.
+    VkPipelineLayoutCreateInfo layout_info{
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+        .pNext = nullptr,
+        .setLayoutCount = 1,
+        .pSetLayouts = &descriptor_layout,
+    };
+
+    VkResult err{
+        vkCreatePipelineLayout(device, &layout_info, nullptr, &out_pipeline_layout) };
+    if (err)
+    {
+        std::cerr << "ERROR: Pipeline layout creation failed." << std::endl;
+        assert(false);
+    }
+
+    // Create pipeline.
+    VkShaderModule compute_draw_shader;
+    if (!vk_pipeline::load_shader_module(("C:/Users/Timo/Documents/Repositories/soranin_game/build/Debug/gradient.comp.spv"),
+                                         device,
+                                         compute_draw_shader))
+    {
+        std::cerr << "ERROR: Shader module loading failed." << std::endl;
+        assert(false);
+    }
+
+    VkPipelineShaderStageCreateInfo stage_info{
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+        .pNext = nullptr,
+        .stage = VK_SHADER_STAGE_COMPUTE_BIT,
+        .module = compute_draw_shader,
+        .pName = "main",
+    };
+
+    VkComputePipelineCreateInfo pipeline_info{
+        .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+        .pNext = nullptr,
+        .stage = stage_info,
+        .layout = out_pipeline_layout,
+    };
+
+    err = vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &pipeline_info, nullptr, &out_pipeline);
+    if (err)
+    {
+        std::cerr << "ERROR: Create compute pipeline failed." << std::endl;
+    }
+
+    // Clean up shader modules.
+    vkDestroyShaderModule(device, compute_draw_shader, nullptr);
+
+    return true;
+}
+
 bool Monolithic_renderer::Impl::build_vulkan_renderer()
 {
     bool result{ true };
@@ -558,6 +658,15 @@ bool Monolithic_renderer::Impl::build_vulkan_renderer()
                                                     m_frames);
     result &= build_vulkan_renderer__sync_structures(m_v_device,
                                                      m_frames);
+    result &= build_vulkan_renderer__descriptors(m_v_device,
+                                                 m_v_HDR_draw_image.image.image_view,
+                                                 m_v_sample_pass.descriptor_alloc,
+                                                 m_v_sample_pass.descriptor_layout,
+                                                 m_v_sample_pass.descriptor_set);
+    result &= build_vulkan_renderer__pipelines(m_v_device,
+                                               m_v_sample_pass.descriptor_layout,
+                                               m_v_sample_pass.pipeline_layout,
+                                               m_v_sample_pass.pipeline);
     return result;
 }
 
@@ -624,10 +733,34 @@ bool teardown_vulkan_renderer__sync_structures(VkDevice device, FrameData frames
     return true;
 }
 
+bool teardown_vulkan_renderer__descriptors(VkDevice device,
+                                           vk_desc::Descriptor_allocator& descriptor_alloc,
+                                           VkDescriptorSetLayout descriptor_layout)
+{
+    descriptor_alloc.destroy_pool(device);
+    vkDestroyDescriptorSetLayout(device, descriptor_layout, nullptr);
+    return true;
+}
+
+bool teardown_vulkan_renderer__pipelines(VkDevice device,
+                                         VkPipelineLayout pipeline_layout,
+                                         VkPipeline pipeline)
+{
+    vkDestroyPipelineLayout(device, pipeline_layout, nullptr);
+    vkDestroyPipeline(device, pipeline, nullptr);
+    return true;
+}
+
 bool Monolithic_renderer::Impl::teardown_vulkan_renderer()
 {
     bool result{ true };
     result &= static_cast<bool>(vkDeviceWaitIdle(m_v_device));
+    result &= teardown_vulkan_renderer__pipelines(m_v_device,
+                                                  m_v_sample_pass.pipeline_layout,
+                                                  m_v_sample_pass.pipeline);
+    result &= teardown_vulkan_renderer__descriptors(m_v_device,
+                                                    m_v_sample_pass.descriptor_alloc,
+                                                    m_v_sample_pass.descriptor_layout);
     result &= teardown_vulkan_renderer__sync_structures(m_v_device, m_frames);
     result &= teardown_vulkan_renderer__cmd_structures(m_v_device, m_frames);
     result &= teardown_vulkan_renderer__hdr_image(m_v_vma_allocator,
@@ -747,6 +880,29 @@ void render__clear_background(VkCommandBuffer cmd,
                          &clear_value,
                          1,
                          &clear_range);
+}
+
+void render__run_sample_pass(VkCommandBuffer cmd,
+                             VkDescriptorSet descriptor_set,
+                             VkPipeline pipeline,
+                             VkPipelineLayout pipeline_layout,
+                             VkExtent2D draw_extent)
+{
+    vkCmdBindPipeline(cmd,
+                      VK_PIPELINE_BIND_POINT_COMPUTE,
+                      pipeline);
+    vkCmdBindDescriptorSets(cmd,
+                            VK_PIPELINE_BIND_POINT_COMPUTE,
+                            pipeline_layout,
+                            0,
+                            1,
+                            &descriptor_set,
+                            0,
+                            nullptr);
+    vkCmdDispatch(cmd,
+                  std::ceil(draw_extent.width / 16.0),
+                  std::ceil(draw_extent.height / 16.0),
+                  1);
 }
 
 void render__blit_HDR_image_to_swapchain(VkCommandBuffer cmd,
@@ -879,6 +1035,11 @@ bool Monolithic_renderer::Impl::render()
     render__prep_HDR_image_for_rendering(cmd, m_v_HDR_draw_image.image.image);
 
     render__clear_background(cmd, m_v_HDR_draw_image.image);
+    render__run_sample_pass(cmd,
+                            m_v_sample_pass.descriptor_set,
+                            m_v_sample_pass.pipeline,
+                            m_v_sample_pass.pipeline_layout,
+                            m_v_HDR_draw_image.extent);
 
     render__blit_HDR_image_to_swapchain(cmd,
                                         m_v_HDR_draw_image.image.image,

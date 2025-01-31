@@ -15,6 +15,7 @@
 #include <cstring>
 #include <iostream>
 #include "renderer_win64_vk_image.h"
+#include "renderer_win64_vk_descriptor_layout_builder.h"
 
 
 struct FrameData
@@ -222,6 +223,15 @@ private:
         vk_image::AllocatedImage image;
         VkExtent2D               extent;
     } m_v_HDR_draw_image;
+
+    struct Sample_pass
+    {
+        vk_desc::Descriptor_allocator descriptor_alloc;
+        VkDescriptorSet descriptor_set;
+        VkDescriptorSetLayout descriptor_layout;
+        VkPipeline pipeline;
+        VkPipelineLayout pipeline_layout;
+    } m_v_sample_pass;
 
     FrameData m_frames[k_frame_overlap];
     std::atomic_size_t m_frame_number{ 0 };
