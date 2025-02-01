@@ -180,3 +180,43 @@ void vk_util::blit_image_to_image(VkCommandBuffer cmd,
 
     vkCmdBlitImage2(cmd, &blit_info);
 }
+
+// Attachment.
+VkRenderingAttachmentInfo vk_util::attachment_info(
+    VkImageView image_view,
+    VkClearValue* clear_value,
+    VkImageLayout layout /*= VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL*/)
+{
+    VkRenderingAttachmentInfo attachment_info{
+        .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+        .pNext = nullptr,
+        .imageView = image_view,
+        .imageLayout = layout,
+        .loadOp = (clear_value == nullptr ?
+                       VK_ATTACHMENT_LOAD_OP_LOAD :
+                       VK_ATTACHMENT_LOAD_OP_CLEAR),
+        .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+    };
+    if (clear_value != nullptr)
+    {
+        attachment_info.clearValue = *clear_value;
+    }
+    return attachment_info;
+}
+
+VkRenderingInfo vk_util::rendering_info(VkExtent2D render_extent,
+                                        VkRenderingAttachmentInfo* color_attachment,
+                                        VkRenderingAttachmentInfo* depth_attachment)
+{
+    VkRenderingInfo rendering_info{
+        .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
+        .pNext = nullptr,
+        .renderArea = VkRect2D{ VkOffset2D{ 0, 0 }, render_extent },
+        .layerCount = 1,
+        .colorAttachmentCount = 1,
+        .pColorAttachments = color_attachment,
+        .pDepthAttachment = depth_attachment,
+        .pStencilAttachment = nullptr,
+    };
+    return rendering_info;
+}

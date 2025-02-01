@@ -39,6 +39,15 @@ void blit_image_to_image(VkCommandBuffer cmd,
                          VkExtent2D dst_size,
                          VkFilter filter = VK_FILTER_LINEAR);
 
+// Rendering.
+VkRenderingAttachmentInfo attachment_info(VkImageView image_view,
+                                          VkClearValue* clear_value,
+                                          VkImageLayout layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+
+VkRenderingInfo rendering_info(VkExtent2D render_extent,
+                               VkRenderingAttachmentInfo* color_attachment,
+                               VkRenderingAttachmentInfo* depth_attachment);
+
 }  // namespace vk_util
 
 

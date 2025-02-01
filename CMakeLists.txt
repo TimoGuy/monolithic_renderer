@@ -29,7 +29,7 @@ endif()
 if(WIN32)
     # Windows renderer uses Vulkan and GLFW for windowing.
     find_package(Vulkan REQUIRED)
-    add_subdirectory("third_party/glfw")
+    add_subdirectory(third_party/glfw)
 else()
     message(FATAL_ERROR "Unsupported OS.")
 endif()
@@ -48,10 +48,26 @@ add_library(${PROJECT_NAME}
     ${CMAKE_CURRENT_SOURCE_DIR}/src/renderer_win64_vk_pipeline.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/renderer_win64_vk_util.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/renderer_win64_vk_util.h
-    # ${CMAKE_CURRENT_SOURCE_DIR}/src/example/example_main.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/vk-bootstrap/VkBootstrap.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/vk-bootstrap/VkBootstrap.h
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/vk-bootstrap/VkBootstrapDispatch.h
+
+    # dear ImGui source files.
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui/backends/imgui_impl_glfw.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui/backends/imgui_impl_glfw.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui/backends/imgui_impl_vulkan.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui/backends/imgui_impl_vulkan.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui/imconfig.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui/imgui_demo.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui/imgui_draw.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui/imgui_internal.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui/imgui_tables.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui/imgui_widgets.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui/imgui.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui/imgui.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui/imstb_rectpack.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui/imstb_textedit.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui/imstb_truetype.h
 )
 
 target_include_directories(${PROJECT_NAME}
@@ -61,6 +77,8 @@ target_include_directories(${PROJECT_NAME}
         ${CMAKE_CURRENT_SOURCE_DIR}/src
         ${CMAKE_CURRENT_SOURCE_DIR}/src/example
         ${CMAKE_CURRENT_SOURCE_DIR}/third_party/glfw/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui
+        ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui/backends
         ${CMAKE_CURRENT_SOURCE_DIR}/third_party/vk-bootstrap
         ${CMAKE_CURRENT_SOURCE_DIR}/third_party/VulkanMemoryAllocator/include
         ${cglm_INCLUDE_DIR}

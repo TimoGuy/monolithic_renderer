@@ -12,6 +12,9 @@
 #include <cinttypes>
 #include <cstring>
 #include <iostream>
+#include "imgui.h"
+#include "imgui_impl_glfw.h"
+#include "imgui_impl_vulkan.h"
 #include "multithreaded_job_system_public.h"
 #include "renderer_win64_vk_pipeline.h"
 #include "renderer_win64_vk_util.h"
@@ -26,6 +29,7 @@ int32_t Monolithic_renderer::Impl::Build_job::execute()
     bool success{ true };
     success &= m_pimpl.build_window();
     success &= m_pimpl.build_vulkan_renderer();
+    success &= m_pimpl.build_imgui();
     return success ? 0 : 1;
 }
 
@@ -46,6 +50,8 @@ int32_t Monolithic_renderer::Impl::Render_job::execute()
 int32_t Monolithic_renderer::Impl::Teardown_job::execute()
 {
     bool success{ true };
+    success &= m_pimpl.wait_for_renderer_idle();
+    success &= m_pimpl.teardown_imgui();
     success &= m_pimpl.teardown_vulkan_renderer();
     success &= m_pimpl.teardown_window();
 
@@ -754,7 +760,6 @@ bool teardown_vulkan_renderer__pipelines(VkDevice device,
 bool Monolithic_renderer::Impl::teardown_vulkan_renderer()
 {
     bool result{ true };
-    result &= static_cast<bool>(vkDeviceWaitIdle(m_v_device));
     result &= teardown_vulkan_renderer__pipelines(m_v_device,
                                                   m_v_sample_pass.pipeline_layout,
                                                   m_v_sample_pass.pipeline);
@@ -776,6 +781,84 @@ bool Monolithic_renderer::Impl::teardown_vulkan_renderer()
 #endif
                                                m_v_surface,
                                                m_v_device);
+    return result;
+}
+
+bool Monolithic_renderer::Impl::wait_for_renderer_idle()
+{
+    return static_cast<bool>(vkDeviceWaitIdle(m_v_device));
+}
+
+// Dear Imgui setup/run/teardown.
+bool Monolithic_renderer::Impl::build_imgui()
+{
+    bool result{ true };
+
+    VkDescriptorPoolSize pool_sizes[]{
+        { VK_DESCRIPTOR_TYPE_SAMPLER, 1000 },
+		{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000 },
+		{ VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000 },
+		{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000 },
+		{ VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000 },
+		{ VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000 },
+		{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000 },
+		{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000 },
+		{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000 },
+		{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000 },
+		{ VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000 },
+    };
+
+    VkDescriptorPoolCreateInfo pool_info{
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+        .flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
+        .maxSets = 1000,
+        .poolSizeCount = static_cast<uint32_t>(std::size(pool_sizes)),
+        .pPoolSizes = pool_sizes,
+    };
+
+    VkResult err{
+        vkCreateDescriptorPool(m_v_device, &pool_info, nullptr, &m_v_imgui_pool) };
+    if (err)
+    {
+        std::cerr << "ERROR: Create imgui descriptor pool failed." << std::endl;
+        result = false;
+    }
+
+    ImGui::CreateContext();
+    ImGui_ImplGlfw_InitForVulkan(m_window, true);
+
+    ImGui_ImplVulkan_InitInfo init_info{
+        .Instance = m_v_instance,
+        .PhysicalDevice = m_v_physical_device,
+        .Device = m_v_device,
+        .QueueFamily = m_v_graphics_queue_family_idx,
+        .Queue = m_v_graphics_queue,
+        .DescriptorPool = m_v_imgui_pool,
+        .MinImageCount = 3,
+        .ImageCount = 3,
+        .MSAASamples = VK_SAMPLE_COUNT_1_BIT,
+        .UseDynamicRendering = true,
+        .PipelineRenderingCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
+            .pNext = nullptr,
+            .colorAttachmentCount = 1,
+            .pColorAttachmentFormats = &m_v_swapchain.image_format,
+        },
+    };
+
+    ImGui_ImplVulkan_Init(&init_info);
+    ImGui_ImplVulkan_CreateFontsTexture();
+
+    return result;
+}
+
+bool Monolithic_renderer::Impl::teardown_imgui()
+{
+    bool result{ true };
+
+    ImGui_ImplVulkan_Shutdown();
+    vkDestroyDescriptorPool(m_v_device, m_v_imgui_pool, nullptr);
+
     return result;
 }
 
@@ -926,9 +1009,44 @@ void render__blit_HDR_image_to_swapchain(VkCommandBuffer cmd,
                                  hdr_image_extent,
                                  swapchain_extent,
                                  VK_FILTER_NEAREST);
-	vk_util::transition_image(cmd,
+}
+
+void render__prep_swapchain_image_for_draw_imgui(VkCommandBuffer cmd,
+                                                 VkImage swapchain_image)
+{
+    vk_util::transition_image(cmd,
                               swapchain_image,
                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                              VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+}
+
+void render__draw_imgui_draw_data(VkCommandBuffer cmd,
+                                  VkExtent2D render_extent,
+                                  VkImageView target_image_view)
+{
+    VkRenderingAttachmentInfo color_attachment{
+        vk_util::attachment_info(target_image_view,
+                                 nullptr,
+                                 VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
+    };
+    VkRenderingInfo render_info{
+        vk_util::rendering_info(render_extent,
+                                &color_attachment,
+                                nullptr)
+    };
+
+    vkCmdBeginRendering(cmd, &render_info);
+    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
+    vkCmdEndRendering(cmd);
+}
+
+void render__prep_swapchain_image_for_presentation(VkCommandBuffer cmd,
+                                                   VkImage swapchain_image,
+                                                   VkImageLayout old_layout)
+{
+    vk_util::transition_image(cmd,
+                              swapchain_image,
+                              old_layout,
                               VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 }
 
@@ -1028,6 +1146,17 @@ bool Monolithic_renderer::Impl::render()
                                                         swapchain_image_idx);
     auto& v_current_swapchain_image{ m_v_swapchain.images[swapchain_image_idx] };
 
+    // Render Imgui.
+    const bool display_imgui{ m_imgui_enabled && m_imgui_visible };
+    if (display_imgui)
+    {
+        ImGui_ImplVulkan_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+        render__imgui();
+        ImGui::Render();
+    }
+
     // Write commands.
     VkCommandBuffer cmd{ current_frame.main_command_buffer };
     render__begin_command_buffer(cmd);
@@ -1040,12 +1169,28 @@ bool Monolithic_renderer::Impl::render()
                             m_v_sample_pass.pipeline,
                             m_v_sample_pass.pipeline_layout,
                             m_v_HDR_draw_image.extent);
-
     render__blit_HDR_image_to_swapchain(cmd,
                                         m_v_HDR_draw_image.image.image,
                                         m_v_HDR_draw_image.extent,
                                         v_current_swapchain_image,
                                         m_v_swapchain.extent);
+    if (display_imgui)
+    {
+        render__prep_swapchain_image_for_draw_imgui(cmd,
+                                                    v_current_swapchain_image);
+        render__draw_imgui_draw_data(cmd,
+                                     m_v_swapchain.extent,
+                                     m_v_swapchain.image_views[swapchain_image_idx]);
+        render__prep_swapchain_image_for_presentation(cmd,
+                                                      v_current_swapchain_image,
+                                                      VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    }
+    else
+    {
+        render__prep_swapchain_image_for_presentation(cmd,
+                                                      v_current_swapchain_image,
+                                                      VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    }
 	render__end_command_buffer(cmd);
 
     // Finish frame.
@@ -1068,6 +1213,12 @@ bool Monolithic_renderer::Impl::render()
         m_stage = Stage::TEARDOWN;
     }
 
+    return true;
+}
+
+bool Monolithic_renderer::Impl::render__imgui()
+{
+    ImGui::ShowDemoWindow();
     return true;
 }
 
