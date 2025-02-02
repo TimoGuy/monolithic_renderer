@@ -16,7 +16,6 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_vulkan.h"
 #include "multithreaded_job_system_public.h"
-#include "renderer_win64_vk_pipeline.h"
 #include "renderer_win64_vk_pipeline_builder.h"
 #include "renderer_win64_vk_util.h"
 
