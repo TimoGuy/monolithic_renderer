@@ -8,6 +8,10 @@
 namespace vk_pipeline
 {
 
+bool load_shader_module(const char* file_path,
+                        VkDevice device,
+                        VkShaderModule& out_shader_module);
+
 class Graphics_pipeline_builder
 {
 public:
