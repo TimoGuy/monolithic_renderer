@@ -181,7 +181,20 @@ void vk_util::blit_image_to_image(VkCommandBuffer cmd,
     vkCmdBlitImage2(cmd, &blit_info);
 }
 
-// Attachment.
+// Rendering.
+VkPipelineShaderStageCreateInfo vk_util::pipeline_shader_stage_info(VkShaderStageFlagBits stage,
+                                                                    VkShaderModule shader)
+{
+    VkPipelineShaderStageCreateInfo info{
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+        .pNext = nullptr,
+        .stage = stage,
+        .module = shader,
+        .pName = "main",
+    };
+    return info;
+}
+
 VkRenderingAttachmentInfo vk_util::attachment_info(
     VkImageView image_view,
     VkClearValue* clear_value,

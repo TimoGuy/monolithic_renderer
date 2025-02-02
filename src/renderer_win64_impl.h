@@ -242,6 +242,12 @@ private:
         VkPipelineLayout pipeline_layout;
     } m_v_sample_pass;
 
+    struct Sample_graphics_pass
+    {
+        VkPipeline pipeline;
+        VkPipelineLayout pipeline_layout;
+    } m_v_sample_graphics_pass;
+
     FrameData m_frames[k_frame_overlap];
     std::atomic_size_t m_frame_number{ 0 };
     

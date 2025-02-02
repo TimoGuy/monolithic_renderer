@@ -4,7 +4,7 @@
 
 #include <vulkan/vulkan.h>
 
-
+// @TODO: MOVE THESE FUNCTIONS TO PIPELINE_BUILDER.h/cpp
 namespace vk_pipeline
 {
 

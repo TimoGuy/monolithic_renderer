@@ -40,6 +40,9 @@ void blit_image_to_image(VkCommandBuffer cmd,
                          VkFilter filter = VK_FILTER_LINEAR);
 
 // Rendering.
+VkPipelineShaderStageCreateInfo pipeline_shader_stage_info(VkShaderStageFlagBits stage,
+                                                           VkShaderModule shader);
+
 VkRenderingAttachmentInfo attachment_info(VkImageView image_view,
                                           VkClearValue* clear_value,
                                           VkImageLayout layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);

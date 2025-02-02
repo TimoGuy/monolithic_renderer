@@ -44,6 +44,8 @@ add_library(${PROJECT_NAME}
     ${CMAKE_CURRENT_SOURCE_DIR}/src/renderer_win64_vk_descriptor_layout_builder.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/renderer_win64_vk_image.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/renderer_win64_vk_image.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/renderer_win64_vk_pipeline_builder.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/renderer_win64_vk_pipeline_builder.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/renderer_win64_vk_pipeline.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/renderer_win64_vk_pipeline.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/renderer_win64_vk_util.cpp

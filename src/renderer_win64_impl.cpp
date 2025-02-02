@@ -17,6 +17,7 @@
 #include "imgui_impl_vulkan.h"
 #include "multithreaded_job_system_public.h"
 #include "renderer_win64_vk_pipeline.h"
+#include "renderer_win64_vk_pipeline_builder.h"
 #include "renderer_win64_vk_util.h"
 
 
@@ -576,7 +577,6 @@ bool build_vulkan_renderer__pipelines(VkDevice device,
         .setLayoutCount = 1,
         .pSetLayouts = &descriptor_layout,
     };
-
     VkResult err{
         vkCreatePipelineLayout(device, &layout_info, nullptr, &out_pipeline_layout) };
     if (err)
@@ -595,18 +595,11 @@ bool build_vulkan_renderer__pipelines(VkDevice device,
         assert(false);
     }
 
-    VkPipelineShaderStageCreateInfo stage_info{
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-        .pNext = nullptr,
-        .stage = VK_SHADER_STAGE_COMPUTE_BIT,
-        .module = compute_draw_shader,
-        .pName = "main",
-    };
-
     VkComputePipelineCreateInfo pipeline_info{
         .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
         .pNext = nullptr,
-        .stage = stage_info,
+        .stage = vk_util::pipeline_shader_stage_info(VK_SHADER_STAGE_COMPUTE_BIT,
+                                                     compute_draw_shader),
         .layout = out_pipeline_layout,
     };
 
@@ -618,6 +611,68 @@ bool build_vulkan_renderer__pipelines(VkDevice device,
 
     // Clean up shader modules.
     vkDestroyShaderModule(device, compute_draw_shader, nullptr);
+
+    return true;
+}
+
+bool build_vulkan_renderer__triangle_graphic_pipeline(VkDevice device,
+                                                      VkFormat draw_format,
+                                                      VkPipelineLayout& out_pipeline_layout,
+                                                      VkPipeline& out_pipeline)
+{
+    // ------------------------------------------------------------------------
+    // Create Graphics pipeline for colored triangle
+    // @NOCHECKIN: @THEA
+    // ------------------------------------------------------------------------
+    VkShaderModule triangle_vert_shader;
+    if (!vk_pipeline::load_shader_module(("C:/Users/Timo/Documents/Repositories/soranin_game/build/Debug/colored_triangle.vert.spv"),
+                                         device,
+                                         triangle_vert_shader))
+    {
+        std::cerr << "ERROR: Shader module loading failed." << std::endl;
+        assert(false);
+    }
+    VkShaderModule triangle_frag_shader;
+    if (!vk_pipeline::load_shader_module(("C:/Users/Timo/Documents/Repositories/soranin_game/build/Debug/colored_triangle.frag.spv"),
+                                         device,
+                                         triangle_frag_shader))
+    {
+        std::cerr << "ERROR: Shader module loading failed." << std::endl;
+        assert(false);
+    }
+
+    // Create pipeline layout.
+    VkPipelineLayoutCreateInfo layout_info{
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+        .pNext = nullptr,
+        .setLayoutCount = 0,
+        .pSetLayouts = nullptr,
+    };
+    VkResult err{
+        vkCreatePipelineLayout(device, &layout_info, nullptr, &out_pipeline_layout) };
+    if (err)
+    {
+        std::cerr << "ERROR: Pipeline layout creation failed." << std::endl;
+        assert(false);
+    }
+
+    // Create pipeline.
+    vk_pipeline::Graphics_pipeline_builder builder;
+    builder.set_pipeline_layout(out_pipeline_layout);
+    builder.set_shaders(triangle_vert_shader, triangle_frag_shader);
+    builder.set_input_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+    builder.set_polygon_mode(VK_POLYGON_MODE_FILL);
+    builder.set_cull_mode(VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE);
+    builder.set_multisampling_none();
+    builder.disable_blending();
+    builder.disable_depthtest();
+    builder.set_color_attachment_format(draw_format);
+    builder.set_depth_format(VK_FORMAT_UNDEFINED);
+    out_pipeline = builder.build_pipeline(device);
+
+    // Clean up.
+    vkDestroyShaderModule(device, triangle_vert_shader, nullptr);
+    vkDestroyShaderModule(device, triangle_frag_shader, nullptr);
 
     return true;
 }
@@ -673,6 +728,10 @@ bool Monolithic_renderer::Impl::build_vulkan_renderer()
                                                m_v_sample_pass.descriptor_layout,
                                                m_v_sample_pass.pipeline_layout,
                                                m_v_sample_pass.pipeline);
+    result &= build_vulkan_renderer__triangle_graphic_pipeline(m_v_device,
+                                                               m_v_HDR_draw_image.image.image_format,
+                                                               m_v_sample_graphics_pass.pipeline_layout,
+                                                               m_v_sample_graphics_pass.pipeline);
     return result;
 }
 
@@ -760,6 +819,9 @@ bool teardown_vulkan_renderer__pipelines(VkDevice device,
 bool Monolithic_renderer::Impl::teardown_vulkan_renderer()
 {
     bool result{ true };
+    result &= teardown_vulkan_renderer__pipelines(m_v_device,
+                                                  m_v_sample_graphics_pass.pipeline_layout,
+                                                  m_v_sample_graphics_pass.pipeline);
     result &= teardown_vulkan_renderer__pipelines(m_v_device,
                                                   m_v_sample_pass.pipeline_layout,
                                                   m_v_sample_pass.pipeline);
@@ -935,15 +997,6 @@ void render__begin_command_buffer(VkCommandBuffer cmd)
     }
 }
 
-void render__prep_HDR_image_for_rendering(VkCommandBuffer cmd,
-                                          VkImage hdr_image)
-{
-    vk_util::transition_image(cmd,
-                              hdr_image,
-                              VK_IMAGE_LAYOUT_UNDEFINED,
-                              VK_IMAGE_LAYOUT_GENERAL);
-}
-
 void render__clear_background(VkCommandBuffer cmd,
                               const vk_image::AllocatedImage& hdr_image)
 {
@@ -983,9 +1036,46 @@ void render__run_sample_pass(VkCommandBuffer cmd,
                             0,
                             nullptr);
     vkCmdDispatch(cmd,
-                  std::ceil(draw_extent.width / 16.0),
-                  std::ceil(draw_extent.height / 16.0),
+                  std::ceil(draw_extent.width / 16.0f),
+                  std::ceil(draw_extent.height / 16.0f),
                   1);
+}
+
+void render__run_sample_geometry_pass(VkCommandBuffer cmd,
+                                      VkImageView image_view,
+                                      VkExtent2D draw_extent,
+                                      VkPipeline pipeline)
+{
+    VkRenderingAttachmentInfo color_attachment{
+        vk_util::attachment_info(image_view,
+                                 nullptr,
+                                 VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL) };
+    VkRenderingInfo render_info{
+        vk_util::rendering_info(draw_extent, &color_attachment, nullptr) };
+    
+    vkCmdBeginRendering(cmd, &render_info);
+
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+
+    VkViewport viewport{
+        .x = 0,
+        .y = 0,
+        .width = static_cast<float_t>(draw_extent.width),
+        .height = static_cast<float_t>(draw_extent.height),
+        .minDepth = 0.0f,
+        .maxDepth = 1.0f,
+    };
+    vkCmdSetViewport(cmd, 0, 1, &viewport);
+
+    VkRect2D scissor{
+        .offset{ .x = 0, .y = 0 },
+        .extent{ draw_extent },
+    };
+    vkCmdSetScissor(cmd, 0, 1, &scissor);
+
+    vkCmdDraw(cmd, 3, 1, 0, 0);
+
+    vkCmdEndRendering(cmd);
 }
 
 void render__blit_HDR_image_to_swapchain(VkCommandBuffer cmd,
@@ -997,7 +1087,7 @@ void render__blit_HDR_image_to_swapchain(VkCommandBuffer cmd,
     // Transition swapchain image for presentation.
     vk_util::transition_image(cmd,
                               hdr_image,
-                              VK_IMAGE_LAYOUT_GENERAL,
+                              VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                               VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 	vk_util::transition_image(cmd,
                               swapchain_image,
@@ -1145,6 +1235,7 @@ bool Monolithic_renderer::Impl::render()
                                                         current_frame,
                                                         swapchain_image_idx);
     auto& v_current_swapchain_image{ m_v_swapchain.images[swapchain_image_idx] };
+    auto& v_current_swapchain_image_view{ m_v_swapchain.image_views[swapchain_image_idx] };
 
     // Render Imgui.
     const bool display_imgui{ m_imgui_enabled && m_imgui_visible };
@@ -1160,36 +1251,52 @@ bool Monolithic_renderer::Impl::render()
     // Write commands.
     VkCommandBuffer cmd{ current_frame.main_command_buffer };
     render__begin_command_buffer(cmd);
-
-    render__prep_HDR_image_for_rendering(cmd, m_v_HDR_draw_image.image.image);
-
-    render__clear_background(cmd, m_v_HDR_draw_image.image);
-    render__run_sample_pass(cmd,
-                            m_v_sample_pass.descriptor_set,
-                            m_v_sample_pass.pipeline,
-                            m_v_sample_pass.pipeline_layout,
-                            m_v_HDR_draw_image.extent);
-    render__blit_HDR_image_to_swapchain(cmd,
-                                        m_v_HDR_draw_image.image.image,
-                                        m_v_HDR_draw_image.extent,
-                                        v_current_swapchain_image,
-                                        m_v_swapchain.extent);
-    if (display_imgui)
     {
-        render__prep_swapchain_image_for_draw_imgui(cmd,
-                                                    v_current_swapchain_image);
-        render__draw_imgui_draw_data(cmd,
-                                     m_v_swapchain.extent,
-                                     m_v_swapchain.image_views[swapchain_image_idx]);
-        render__prep_swapchain_image_for_presentation(cmd,
-                                                      v_current_swapchain_image,
-                                                      VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-    }
-    else
-    {
-        render__prep_swapchain_image_for_presentation(cmd,
-                                                      v_current_swapchain_image,
-                                                      VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+        // General rendering.
+        vk_util::transition_image(cmd,
+                                m_v_HDR_draw_image.image.image,
+                                VK_IMAGE_LAYOUT_UNDEFINED,
+                                VK_IMAGE_LAYOUT_GENERAL);
+        render__clear_background(cmd, m_v_HDR_draw_image.image);
+        render__run_sample_pass(cmd,
+                                m_v_sample_pass.descriptor_set,
+                                m_v_sample_pass.pipeline,
+                                m_v_sample_pass.pipeline_layout,
+                                m_v_HDR_draw_image.extent);
+        
+        // Geometry rendering.
+        vk_util::transition_image(cmd,
+                                m_v_HDR_draw_image.image.image,
+                                VK_IMAGE_LAYOUT_GENERAL,
+                                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+        render__run_sample_geometry_pass(cmd,
+                                         m_v_HDR_draw_image.image.image_view,
+                                         m_v_HDR_draw_image.extent,
+                                         m_v_sample_graphics_pass.pipeline);
+
+        // Swapchain.
+        render__blit_HDR_image_to_swapchain(cmd,
+                                            m_v_HDR_draw_image.image.image,
+                                            m_v_HDR_draw_image.extent,
+                                            v_current_swapchain_image,
+                                            m_v_swapchain.extent);
+        if (display_imgui)
+        {
+            render__prep_swapchain_image_for_draw_imgui(cmd,
+                                                        v_current_swapchain_image);
+            render__draw_imgui_draw_data(cmd,
+                                        m_v_swapchain.extent,
+                                        v_current_swapchain_image_view);
+            render__prep_swapchain_image_for_presentation(cmd,
+                                                        v_current_swapchain_image,
+                                                        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+        }
+        else
+        {
+            render__prep_swapchain_image_for_presentation(cmd,
+                                                        v_current_swapchain_image,
+                                                        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+        }
     }
 	render__end_command_buffer(cmd);
 
