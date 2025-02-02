@@ -9,7 +9,7 @@
 namespace vk_image
 {
 
-struct AllocatedImage
+struct Allocated_image
 {
     VkImage       image;
     VkImageView   image_view;

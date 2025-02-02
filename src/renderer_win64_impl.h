@@ -229,8 +229,8 @@ private:
 
     struct HDR_draw_image
     {
-        vk_image::AllocatedImage image;
-        VkExtent2D               extent;
+        vk_image::Allocated_image image;
+        VkExtent2D                extent;
     } m_v_HDR_draw_image;
 
     struct Sample_pass

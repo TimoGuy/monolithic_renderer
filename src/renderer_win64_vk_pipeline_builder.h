@@ -12,6 +12,8 @@ bool load_shader_module(const char* file_path,
                         VkDevice device,
                         VkShaderModule& out_shader_module);
 
+// @TODO: Add compute pipeline builder.
+
 class Graphics_pipeline_builder
 {
 public:

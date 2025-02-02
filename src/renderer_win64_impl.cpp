@@ -366,7 +366,7 @@ bool build_vulkan_renderer__hdr_image(VmaAllocator allocator,
                                       VkDevice device,
                                       int32_t window_width,
                                       int32_t window_height,
-                                      vk_image::AllocatedImage& out_hdr_image,
+                                      vk_image::Allocated_image& out_hdr_image,
                                       VkExtent2D& out_hdr_image_extent)
 {
     // Create HDR draw image.
@@ -770,7 +770,7 @@ bool teardown_vulkan_renderer__swapchain(VkDevice device,
 
 bool teardown_vulkan_renderer__hdr_image(VmaAllocator allocator,
                                          VkDevice device,
-                                         const vk_image::AllocatedImage& hdr_image)
+                                         const vk_image::Allocated_image& hdr_image)
 {
     vkDestroyImageView(device, hdr_image.image_view, nullptr);
     vmaDestroyImage(allocator, hdr_image.image, hdr_image.allocation);
@@ -997,7 +997,7 @@ void render__begin_command_buffer(VkCommandBuffer cmd)
 }
 
 void render__clear_background(VkCommandBuffer cmd,
-                              const vk_image::AllocatedImage& hdr_image)
+                              const vk_image::Allocated_image& hdr_image)
 {
     VkClearColorValue clear_value{
         .float32{ 0.0f, 0.5f, 0.1f, 1.0f }
