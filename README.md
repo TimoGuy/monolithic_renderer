@@ -16,7 +16,11 @@ In the case of a Windows renderer, this renderer owns GPU driver access and wind
 - Minimum Required.
 - [ ] Whole render graph barebones stuff.
     - [ ] Atmospheric scattering skybox amortization.
+    - [ ] Vertex transformations via compute with dynamic meshes.
+        - [ ] Skinning.
+        - [ ] Fabric animations.
     - [ ] Pre-do
+        - [ ] Frustum and Occlusion Culling
         - [ ] Z prepass.
         - [ ] Light culling.
     - [ ] PBR renderer.
