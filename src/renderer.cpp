@@ -1,4 +1,6 @@
 #include "renderer.h"
+#include "gltf_loader.h"
+
 
 // Platform-specific implementations.
 #if _WIN64
@@ -24,6 +26,7 @@ Monolithic_renderer::Monolithic_renderer(
                                      fallback_content_height,
                                      *this))
 {
+    gltf_loader::load_gltf("C:\\Users\\Timo\\Documents\\Repositories\\solanine_vulkan\\solanine_vulkan\\res\\models\\SlimeGirl.glb");
     Monolithic_renderer* expected{ nullptr };
     if (!s_mr_singleton_ptr.compare_exchange_strong(expected, this))
     {

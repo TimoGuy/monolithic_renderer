@@ -33,9 +33,12 @@ if(WIN32)
 else()
     message(FATAL_ERROR "Unsupported OS.")
 endif()
+add_subdirectory(third_party/fastgltf)
 
 # Static library build.
 add_library(${PROJECT_NAME}
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gltf_loader.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gltf_loader.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/renderer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/renderer.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/renderer_win64_impl.cpp
@@ -79,7 +82,7 @@ target_include_directories(${PROJECT_NAME}
         ${CMAKE_CURRENT_SOURCE_DIR}/include
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/example
+        ${CMAKE_CURRENT_SOURCE_DIR}/third_party/fastgltf/include
         ${CMAKE_CURRENT_SOURCE_DIR}/third_party/glfw/include
         ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui
         ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui/backends
@@ -92,6 +95,7 @@ target_include_directories(${PROJECT_NAME}
 )
 
 target_link_libraries(${PROJECT_NAME}
+    fastgltf
     glfw
     ${GLFW_LIBRARIES}
     Vulkan::Vulkan
