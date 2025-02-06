@@ -5,7 +5,15 @@
 #include "fastgltf/core.hpp"
 #include "fastgltf/types.hpp"
 #include "fastgltf/tools.hpp"
+#include "material_bank.h"
 
+
+namespace gltf_loader
+{
+
+static std::vector<Model> s_all_models;
+
+}  // namespace gltf_loader
 
 void gltf_loader::load_gltf(const std::string& path_str)
 {
@@ -41,8 +49,25 @@ void gltf_loader::load_gltf(const std::string& path_str)
     // vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
 
     // Check that all material names are valid.
+    std::vector<uint32_t> mesh_indexes;
+    mesh_indexes.reserve(asset.meshes.size());
+    for (auto& mesh : asset.meshes)
+    {
+        std::string mesh_name{ mesh.name };
+        auto mesh_idx{
+            material_bank::get_mat_idx_from_name(mesh_name) };
+        if (mesh_idx == material_bank::k_invalid_material_idx)
+        {
+            std::cerr
+                << "ERROR: Validating material \"" << mesh_name << "\" failed."
+                << std::endl;
+            return;
+        }
+        mesh_indexes.emplace_back(mesh_idx);
+    }
 
     // Assign material id to each mesh.
+
 
     // Load geometry onto gpu with material information.
 

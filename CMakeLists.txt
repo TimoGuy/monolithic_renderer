@@ -39,6 +39,8 @@ add_subdirectory(third_party/fastgltf)
 add_library(${PROJECT_NAME}
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gltf_loader.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gltf_loader.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/material_bank.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/material_bank.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/renderer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/renderer.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/renderer_win64_impl.cpp
