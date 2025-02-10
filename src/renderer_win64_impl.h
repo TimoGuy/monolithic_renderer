@@ -17,6 +17,8 @@
 #include "renderer_win64_vk_image.h"
 #include "renderer_win64_vk_descriptor_layout_builder.h"
 
+namespace vk_util { struct Immediate_submit_support; }
+
 
 struct FrameData
 {
@@ -59,22 +61,12 @@ public:
          int32_t content_height,
          int32_t fallback_content_width,
          int32_t fallback_content_height,
-         Job_source& source)
-        : m_name(name)
-        , m_window_width(content_width)
-        , m_window_height(content_height)
-        , m_fallback_window_width(fallback_content_width)
-        , m_fallback_window_height(fallback_content_height)
-        , m_build_job(std::make_unique<Build_job>(source, *this))
-        , m_update_data_job(std::make_unique<Update_data_job>(source, *this))
-        , m_render_job(std::make_unique<Render_job>(source, *this))
-        , m_teardown_job(std::make_unique<Teardown_job>(source, *this))
-    {
-    }
+         Job_source& source);
 
     enum class Stage : uint32_t
     {
         BUILD = 0,
+        LOAD_ASSETS,
         UPDATE_DATA,
         RENDER,
         TEARDOWN,
@@ -125,6 +117,18 @@ public:
         Monolithic_renderer::Impl& m_pimpl;
     };
     std::unique_ptr<Build_job> m_build_job;
+
+    class Load_assets_job : public Job_ifc
+    {
+    public:
+        Load_assets_job(Job_source& source)
+            : Job_ifc("Load assets job", source)
+        {
+        }
+
+        int32_t execute() override;
+    };
+    std::unique_ptr<Load_assets_job> m_load_assets_job;
 
     class Update_data_job : public Job_ifc
     {
@@ -202,6 +206,8 @@ private:
     int32_t m_fallback_window_width;
     int32_t m_fallback_window_height;
     GLFWwindow* m_window{ nullptr };
+
+    vk_util::Immediate_submit_support* m_immediate_submit_support{ nullptr };
 
     std::atomic_bool m_is_swapchain_out_of_date{ false };
     std::atomic_bool m_request_swapchain_creation{ false };

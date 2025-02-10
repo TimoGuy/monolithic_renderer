@@ -6,6 +6,7 @@
 #include <vulkan/vulkan.h>
 #endif  // _WIN64
 #include "cglm/cglm.h"
+#include "renderer_win64_vk_immediate_submit.h"
 
 
 namespace gltf_loader
@@ -40,40 +41,25 @@ struct GPU_vertex
 // Having a skinned version that goes into an intermediate vertex buffer would be super good too.
 // Ummmmmm, I also think that having animations and stuff down to a tee would be good.
 // @TODO: look at how the animations are structured inside the gltf thingo in the solanine_vulkan project.
-//
-// Also, I got a list of material names:
-// - gold
-// - slime_body
-// - clothing_tights
-// - slimegirl_eyebrows
-// - slimegirl_eyes
-// - slime_hair
-// - suede_white
-// - suede_gray
-// - rubber_black
-// - plastic_green
-// - denim
-// - leather
-// - corduroy_white
-// - ribbed_tan
-// - knitting_green
-
 
 struct Primitive
 {
-    uint32_t material_idx;
-};
-
-struct Mesh
-{
-    std::vector<Primitive> primitives;
+    uint32_t start_index;
+    uint32_t index_count;
+    uint32_t default_material_idx;
 };
 
 struct Model
 {
-    std::vector<Mesh> meshes;
+    uint32_t base_index;
+    std::vector<Primitive> primitives;
 };
 
 bool load_gltf(const std::string& path_str);
+
+bool upload_combined_mesh(const vk_util::Immediate_submit_support& support,
+                          VkDevice device,
+                          VkQueue queue,
+                          VmaAllocator allocator);
 
 }  // namespace gltf_loader

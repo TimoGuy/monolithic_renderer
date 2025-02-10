@@ -12,16 +12,38 @@
 #include <cinttypes>
 #include <cstring>
 #include <iostream>
+#include "gltf_loader.h"
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_vulkan.h"
+#include "material_bank.h"
 #include "multithreaded_job_system_public.h"
+#include "renderer_win64_vk_immediate_submit.h"
 #include "renderer_win64_vk_pipeline_builder.h"
 #include "renderer_win64_vk_util.h"
 
 
 // For extern symbol.
 std::atomic<Monolithic_renderer*> s_mr_singleton_ptr{ nullptr };
+
+Monolithic_renderer::Impl::Impl(const std::string& name,
+                                int32_t content_width,
+                                int32_t content_height,
+                                int32_t fallback_content_width,
+                                int32_t fallback_content_height,
+                                Job_source& source)
+    : m_name(name)
+    , m_window_width(content_width)
+    , m_window_height(content_height)
+    , m_fallback_window_width(fallback_content_width)
+    , m_fallback_window_height(fallback_content_height)
+    , m_build_job(std::make_unique<Build_job>(source, *this))
+    , m_load_assets_job(std::make_unique<Load_assets_job>(source))
+    , m_update_data_job(std::make_unique<Update_data_job>(source, *this))
+    , m_render_job(std::make_unique<Render_job>(source, *this))
+    , m_teardown_job(std::make_unique<Teardown_job>(source, *this))
+{
+}
 
 // Jobs.
 int32_t Monolithic_renderer::Impl::Build_job::execute()
@@ -31,6 +53,35 @@ int32_t Monolithic_renderer::Impl::Build_job::execute()
     success &= m_pimpl.build_vulkan_renderer();
     success &= m_pimpl.build_imgui();
     return success ? 0 : 1;
+}
+
+int32_t Monolithic_renderer::Impl::Load_assets_job::execute()
+{
+    material_bank::register_material("Body", {});
+    material_bank::register_material("Tights", {});
+    material_bank::register_material("gold", {});
+    material_bank::register_material("slime_body", {});
+    material_bank::register_material("clothing_tights", {});
+    material_bank::register_material("slimegirl_eyebrows", {});
+    material_bank::register_material("slimegirl_eyes", {});
+    material_bank::register_material("slime_hair", {});
+    material_bank::register_material("suede_white", {});
+    material_bank::register_material("suede_gray", {});
+    material_bank::register_material("rubber_black", {});
+    material_bank::register_material("plastic_green", {});
+    material_bank::register_material("denim", {});
+    material_bank::register_material("leather", {});
+    material_bank::register_material("corduroy_white", {});
+    material_bank::register_material("ribbed_tan", {});
+    material_bank::register_material("knitting_green", {});
+
+    gltf_loader::load_gltf("res/models/SlimeGirl.glb");
+    gltf_loader::load_gltf("res/models/EnemyWIP.glb");  // @TODO: START HERE @THEA
+    gltf_loader::upload_combined_mesh(m_immediate_submit_support,
+                                      m_v_device,
+                                      m_v_queue,
+                                      m_v_vma_allocator);
+    return 0;
 }
 
 int32_t Monolithic_renderer::Impl::Update_data_job::execute()
@@ -71,6 +122,13 @@ Job_source::Job_next_jobs_return_data Monolithic_renderer::Impl::fetch_next_jobs
         case Stage::BUILD:
             return_data.jobs = {
                 m_build_job.get(),
+            };
+            m_stage = Stage::LOAD_ASSETS;
+            break;
+
+        case Stage::LOAD_ASSETS:
+            return_data.jobs = {
+                m_load_assets_job.get(),
             };
             m_stage = Stage::UPDATE_DATA;
             break;
@@ -586,7 +644,7 @@ bool build_vulkan_renderer__pipelines(VkDevice device,
 
     // Create pipeline.
     VkShaderModule compute_draw_shader;
-    if (!vk_pipeline::load_shader_module(("C:/Users/Timo/Documents/Repositories/soranin_game/build/Debug/gradient.comp.spv"),
+    if (!vk_pipeline::load_shader_module(("res/shaders/gradient.comp.spv"),
                                          device,
                                          compute_draw_shader))
     {
@@ -624,7 +682,7 @@ bool build_vulkan_renderer__triangle_graphic_pipeline(VkDevice device,
     // @NOCHECKIN: @THEA
     // ------------------------------------------------------------------------
     VkShaderModule triangle_vert_shader;
-    if (!vk_pipeline::load_shader_module(("C:/Users/Timo/Documents/Repositories/soranin_game/build/Debug/colored_triangle.vert.spv"),
+    if (!vk_pipeline::load_shader_module(("res/shaders/colored_triangle.vert.spv"),
                                          device,
                                          triangle_vert_shader))
     {
@@ -632,7 +690,7 @@ bool build_vulkan_renderer__triangle_graphic_pipeline(VkDevice device,
         assert(false);
     }
     VkShaderModule triangle_frag_shader;
-    if (!vk_pipeline::load_shader_module(("C:/Users/Timo/Documents/Repositories/soranin_game/build/Debug/colored_triangle.frag.spv"),
+    if (!vk_pipeline::load_shader_module(("res/shaders/colored_triangle.frag.spv"),
                                          device,
                                          triangle_frag_shader))
     {
@@ -694,6 +752,7 @@ bool Monolithic_renderer::Impl::build_vulkan_renderer()
                                                m_v_physical_device,
                                                m_v_device,
                                                m_v_vma_allocator);
+    vk_util::init_immediate_submit_support()
     result &= build_vulkan_renderer__swapchain(m_v_surface,
                                                m_v_physical_device,
                                                m_v_device,

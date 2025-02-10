@@ -10,17 +10,18 @@
 #include "fastgltf/tools.hpp"
 #include "fastgltf/types.hpp"
 #include "material_bank.h"
+#include "renderer_win64_vk_buffer.h"
 
 
 namespace gltf_loader
 {
 
-static std::vector<Model> s_all_models;
-
 // To fit all models into one buffer, using this vertex offset.
 static std::atomic_uint32_t s_indices_base_vertex{ 0 };
 static std::vector<uint32_t> s_all_indices;  // Use `s_indices_base_vertex` for visibility.
 static std::vector<GPU_vertex> s_all_vertices;  // Use `s_indices_base_vertex` for visibility.
+static std::vector<Model> s_all_models;  // Accessor into all indices.
+static vk_buffer::GPU_mesh_buffer s_static_mesh_buffer;  // Cooked buffer.
 
 // glTF 2.0 attribute strings.
 constexpr const char* k_position_str{ "POSITION" };
@@ -190,10 +191,17 @@ bool gltf_loader::load_gltf(const std::string& path_str)
 
     // Acquire base vertex atomically and lock.
     uint32_t base_vertex;
+    uint32_t base_vertex_load;
     do
-    {   base_vertex = s_indices_base_vertex.load();
-        if (base_vertex == (uint32_t)-1) base_vertex = 0;
-    } while (s_indices_base_vertex.compare_exchange_weak(base_vertex, (uint32_t)-1));
+    {   base_vertex_load = s_indices_base_vertex.load();
+        if (base_vertex_load == (uint32_t)-1) base_vertex_load = 0;
+        base_vertex = base_vertex_load;
+    } while (!s_indices_base_vertex.compare_exchange_weak(base_vertex_load, (uint32_t)-1));
+
+    // Mark base index with new model.
+    Model new_model{
+        .base_index = static_cast<uint32_t>(s_all_indices.size()),
+    };
 
     // @NOTE: Primitive index is the primitive num inside of each individual model.
     //        Used for finding which material to access within a material set.
@@ -205,6 +213,15 @@ bool gltf_loader::load_gltf(const std::string& path_str)
     for (auto& primitive : mesh.primitives)
     {
         assert(primitive.type == fastgltf::PrimitiveType::Triangles);
+
+        std::string material_name{
+            asset.materials[primitive.materialIndex.value()].name };
+
+        Primitive new_primitive{
+            .start_index = static_cast<uint32_t>(s_all_indices.size()),
+            .default_material_idx =
+                material_bank::get_mat_idx_from_name(material_name),
+        };
 
         // Load indices.
         {
@@ -278,8 +295,12 @@ bool gltf_loader::load_gltf(const std::string& path_str)
 
             // @TODO: @THEA: add joints and weights.
         }
-        
+
         primitive_index++;
+        base_vertex = s_all_vertices.size();
+        new_primitive.index_count =
+            (s_all_indices.size() - new_primitive.start_index);
+        new_model.primitives.emplace_back(new_primitive);
     }
 
 // @TODO: implement animations and stuff @THEA
@@ -306,9 +327,46 @@ bool gltf_loader::load_gltf(const std::string& path_str)
     // There could also be something like a warning if the score is bad enough.
 #endif  // _DEBUG
 
-    // 
+    s_all_models.emplace_back(new_model);
+
+    // Release lock on loading new gltf models.
     s_indices_base_vertex.store(base_vertex);
 
     return true;
 }
 
+bool gltf_loader::upload_combined_mesh(const vk_util::Immediate_submit_support& support,
+                                       VkDevice device,
+                                       VkQueue queue,
+                                       VmaAllocator allocator)
+{
+    // Acquire base vertex atomically and lock.
+    // @COPYPASTA
+    uint32_t base_vertex;
+    uint32_t base_vertex_load;
+    do
+    {
+        base_vertex_load = s_indices_base_vertex.load();
+        if (base_vertex_load == (uint32_t)-1) base_vertex_load = 0;
+        base_vertex = base_vertex_load;
+    } while (!s_indices_base_vertex.compare_exchange_weak(base_vertex_load, (uint32_t)-1));
+
+    // Upload combined mesh to gpu.
+    s_static_mesh_buffer =
+        vk_buffer::upload_mesh_to_gpu(support,
+                                      device,
+                                      queue,
+                                      allocator,
+                                      std::move(s_all_indices),
+                                      std::move(s_all_vertices));
+
+    // Clear all cpu side buffers.
+    s_all_indices.clear();
+    s_all_vertices.clear();
+    s_all_models.clear();
+
+    // Release lock on loading new gltf models.
+    s_indices_base_vertex.store(0);
+
+    return true;
+}
