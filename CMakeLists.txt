@@ -37,6 +37,7 @@ add_subdirectory(third_party/fastgltf)
 
 # Static library build.
 add_library(${PROJECT_NAME}
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/fastgltf_support__cglm_element_traits.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gltf_loader.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gltf_loader.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/material_bank.cpp

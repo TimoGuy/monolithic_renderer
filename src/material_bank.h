@@ -13,6 +13,9 @@ constexpr uint32_t k_invalid_material_idx{ (uint32_t)-1 };
 
 struct GPU_material  // @CHECK I think this would be what I need for making materials.
 {
+    // @TODO: ideally, there will be a set of materials but since there are parameters to
+    //        play with with each material (i.e. with pbr there's only one material but many many params to turn)
+    //        there needs to be some way to get material variants or material parameters in here while being customizable.
     VkPipeline pipeline;
     VkPipelineLayout pipeline_layout;
     std::vector<VkDescriptorSet> descriptor_sets;

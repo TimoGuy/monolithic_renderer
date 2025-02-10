@@ -46,7 +46,7 @@ void vk_buffer::destroy_buffer(VmaAllocator allocator,
     vmaDestroyBuffer(allocator, buffer.buffer, buffer.allocation);
 }
 
-vk_buffer::GPU_mesh_buffer vk_buffer::upload_mesh_to_gpu(const vk_util::Immediate_submit_support &support,
+vk_buffer::GPU_mesh_buffer vk_buffer::upload_mesh_to_gpu(const vk_util::Immediate_submit_support& support,
                                                          VkDevice device,
                                                          VkQueue queue,
                                                          VmaAllocator allocator,

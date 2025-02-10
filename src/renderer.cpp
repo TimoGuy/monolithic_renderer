@@ -1,5 +1,6 @@
 #include "renderer.h"
 #include "gltf_loader.h"
+#include "material_bank.h"
 
 
 // Platform-specific implementations.
@@ -26,6 +27,21 @@ Monolithic_renderer::Monolithic_renderer(
                                      fallback_content_height,
                                      *this))
 {
+    material_bank::register_material("gold", {});
+    material_bank::register_material("slime_body", {});
+    material_bank::register_material("clothing_tights", {});
+    material_bank::register_material("slimegirl_eyebrows", {});
+    material_bank::register_material("slimegirl_eyes", {});
+    material_bank::register_material("slime_hair", {});
+    material_bank::register_material("suede_white", {});
+    material_bank::register_material("suede_gray", {});
+    material_bank::register_material("rubber_black", {});
+    material_bank::register_material("plastic_green", {});
+    material_bank::register_material("denim", {});
+    material_bank::register_material("leather", {});
+    material_bank::register_material("corduroy_white", {});
+    material_bank::register_material("ribbed_tan", {});
+    material_bank::register_material("knitting_green", {});
     gltf_loader::load_gltf("C:\\Users\\Timo\\Documents\\Repositories\\solanine_vulkan\\solanine_vulkan\\res\\models\\SlimeGirl.glb");
     Monolithic_renderer* expected{ nullptr };
     if (!s_mr_singleton_ptr.compare_exchange_strong(expected, this))

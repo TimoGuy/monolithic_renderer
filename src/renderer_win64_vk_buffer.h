@@ -6,9 +6,11 @@
 #include <vk_mem_alloc.h>
 #include <vector>
 #include "cglm/cglm.h"
+#include "gltf_loader.h"
 
 
 namespace vk_util{ struct Immediate_submit_support; }
+using GPU_vertex = gltf_loader::GPU_vertex;
 
 namespace vk_buffer
 {
@@ -35,16 +37,7 @@ struct GPU_mesh_buffer
     VkDeviceAddress  vertex_buffer_address;
 };
 
-struct GPU_vertex
-{
-    vec3    position;
-	float_t uv_x;
-	vec3    normal;
-	float_t uv_y;
-	vec4    color;
-};
-
-GPU_mesh_buffer upload_mesh_to_gpu(const vk_util::Immediate_submit_support &support,
+GPU_mesh_buffer upload_mesh_to_gpu(const vk_util::Immediate_submit_support& support,
                                    VkDevice device,
                                    VkQueue queue,
                                    VmaAllocator allocator,
