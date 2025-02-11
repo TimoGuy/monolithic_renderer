@@ -50,3 +50,10 @@ const material_bank::GPU_material& material_bank::get_material(uint32_t idx)
     assert(idx < s_all_materials.size());
     return s_all_materials[idx];
 }
+
+bool material_bank::teardown_all_materials()
+{
+    // @TODO: implement.
+    assert(false);
+    return true;
+}

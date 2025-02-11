@@ -4,6 +4,7 @@
 #include <vector>
 #if _WIN64
 #include <vulkan/vulkan.h>
+#include <vk_mem_alloc.h>
 #endif  // _WIN64
 #include "cglm/cglm.h"
 #include "renderer_win64_vk_immediate_submit.h"
@@ -61,5 +62,7 @@ bool upload_combined_mesh(const vk_util::Immediate_submit_support& support,
                           VkDevice device,
                           VkQueue queue,
                           VmaAllocator allocator);
+
+bool teardown_all_meshes();
 
 }  // namespace gltf_loader

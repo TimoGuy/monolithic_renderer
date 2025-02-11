@@ -28,4 +28,6 @@ uint32_t get_mat_idx_from_name(const std::string& mat_name);
 
 const GPU_material& get_material(uint32_t idx);
 
+bool teardown_all_materials();
+
 }  // namespace material_bank

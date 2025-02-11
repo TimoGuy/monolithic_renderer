@@ -102,13 +102,13 @@ vk_buffer::GPU_mesh_buffer vk_buffer::upload_mesh_to_gpu(const vk_util::Immediat
             .dstOffset = 0,
             .size = index_buffer_size,
         };
+        vkCmdCopyBuffer(cmd, staging_buffer.buffer, new_mesh.index_buffer.buffer, 1, &indices_copy);
         VkBufferCopy vertices_copy{
             .srcOffset = index_buffer_size,
             .dstOffset = 0,
             .size = vertex_buffer_size,
         };
-        VkBufferCopy copies[]{ indices_copy, vertices_copy };
-        vkCmdCopyBuffer(cmd, staging_buffer.buffer, new_mesh.index_buffer.buffer, 2, copies);
+        vkCmdCopyBuffer(cmd, staging_buffer.buffer, new_mesh.vertex_buffer.buffer, 1, &vertices_copy);
     });
 
     destroy_buffer(allocator, staging_buffer);

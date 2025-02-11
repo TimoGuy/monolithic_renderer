@@ -14,8 +14,9 @@
 #include <cinttypes>
 #include <cstring>
 #include <iostream>
-#include "renderer_win64_vk_image.h"
 #include "renderer_win64_vk_descriptor_layout_builder.h"
+#include "renderer_win64_vk_image.h"
+#include "renderer_win64_vk_immediate_submit.h"
 
 namespace vk_util { struct Immediate_submit_support; }
 
@@ -121,12 +122,15 @@ public:
     class Load_assets_job : public Job_ifc
     {
     public:
-        Load_assets_job(Job_source& source)
+        Load_assets_job(Job_source& source, Monolithic_renderer::Impl& pimpl)
             : Job_ifc("Load assets job", source)
+            , m_pimpl(pimpl)
         {
         }
 
         int32_t execute() override;
+
+        Monolithic_renderer::Impl& m_pimpl;
     };
     std::unique_ptr<Load_assets_job> m_load_assets_job;
 
@@ -207,7 +211,7 @@ private:
     int32_t m_fallback_window_height;
     GLFWwindow* m_window{ nullptr };
 
-    vk_util::Immediate_submit_support* m_immediate_submit_support{ nullptr };
+    vk_util::Immediate_submit_support m_immediate_submit_support;
 
     std::atomic_bool m_is_swapchain_out_of_date{ false };
     std::atomic_bool m_request_swapchain_creation{ false };

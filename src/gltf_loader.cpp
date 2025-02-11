@@ -5,10 +5,12 @@
 #include <iostream>
 #include <vector>
 #include "cglm/cglm.h"
+// Fast gltf includes must be in this order. //
 #include "fastgltf_support__cglm_element_traits.h"
 #include "fastgltf/core.hpp"
 #include "fastgltf/tools.hpp"
 #include "fastgltf/types.hpp"
+///////////////////////////////////////////////
 #include "material_bank.h"
 #include "renderer_win64_vk_buffer.h"
 
@@ -368,5 +370,12 @@ bool gltf_loader::upload_combined_mesh(const vk_util::Immediate_submit_support& 
     // Release lock on loading new gltf models.
     s_indices_base_vertex.store(0);
 
+    return true;
+}
+
+bool gltf_loader::teardown_all_meshes()
+{
+    // @TODO: implement.
+    assert(false);
     return true;
 }

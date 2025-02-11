@@ -18,7 +18,6 @@
 #include "imgui_impl_vulkan.h"
 #include "material_bank.h"
 #include "multithreaded_job_system_public.h"
-#include "renderer_win64_vk_immediate_submit.h"
 #include "renderer_win64_vk_pipeline_builder.h"
 #include "renderer_win64_vk_util.h"
 
@@ -38,7 +37,7 @@ Monolithic_renderer::Impl::Impl(const std::string& name,
     , m_fallback_window_width(fallback_content_width)
     , m_fallback_window_height(fallback_content_height)
     , m_build_job(std::make_unique<Build_job>(source, *this))
-    , m_load_assets_job(std::make_unique<Load_assets_job>(source))
+    , m_load_assets_job(std::make_unique<Load_assets_job>(source, *this))
     , m_update_data_job(std::make_unique<Update_data_job>(source, *this))
     , m_render_job(std::make_unique<Render_job>(source, *this))
     , m_teardown_job(std::make_unique<Teardown_job>(source, *this))
@@ -57,6 +56,7 @@ int32_t Monolithic_renderer::Impl::Build_job::execute()
 
 int32_t Monolithic_renderer::Impl::Load_assets_job::execute()
 {
+    // @TODO: @THEA: add these material and model constructions into the actual soranin game as a constructor param.
     material_bank::register_material("Body", {});
     material_bank::register_material("Tights", {});
     material_bank::register_material("gold", {});
@@ -75,12 +75,32 @@ int32_t Monolithic_renderer::Impl::Load_assets_job::execute()
     material_bank::register_material("ribbed_tan", {});
     material_bank::register_material("knitting_green", {});
 
-    gltf_loader::load_gltf("res/models/SlimeGirl.glb");
-    gltf_loader::load_gltf("res/models/EnemyWIP.glb");  // @TODO: START HERE @THEA
-    gltf_loader::upload_combined_mesh(m_immediate_submit_support,
-                                      m_v_device,
-                                      m_v_queue,
-                                      m_v_vma_allocator);
+    gltf_loader::load_gltf("res/models/slime_girl.glb");
+    gltf_loader::load_gltf("res/models/enemy_wip.glb");
+    gltf_loader::load_gltf("res/models/box.gltf");
+    gltf_loader::upload_combined_mesh(m_pimpl.m_immediate_submit_support,
+                                      m_pimpl.m_v_device,
+                                      m_pimpl.m_v_graphics_queue,
+                                      m_pimpl.m_v_vma_allocator);
+
+    // Report memory heap usage.
+    VmaBudget budgets[VK_MAX_MEMORY_HEAPS];
+    vmaGetHeapBudgets(m_pimpl.m_v_vma_allocator, budgets);
+    for (uint32_t i = 0; i < m_pimpl.m_v_vma_allocator->GetMemoryHeapCount(); i++)
+    {
+        uint32_t allocs{ budgets[i].statistics.allocationCount };
+        float_t allocs_mb{ budgets[i].statistics.allocationBytes / 1024.0f / 1024.0f };
+        uint32_t blocks{ budgets[i].statistics.blockCount };
+        float_t blocks_mb{ budgets[i].statistics.blockBytes / 1024.0f / 1024.0f };
+        float_t usage_mb{ budgets[i].usage / 1024.0f / 1024.0f };
+        float_t budget_mb{ budgets[i].budget / 1024.0f / 1024.0f };
+        std::cout
+            << (i == 0 ? "-=-=- GPU Memory Report -=-=-" : "") << std::endl
+            << "# Memory Heap " << i << std::endl
+            << "  " << allocs << " allocations (" << allocs_mb << " MB)" << std::endl
+            << "  " << blocks << " blocks (" << blocks_mb << " MB)" << std::endl
+            << "  " << usage_mb << " MB usage / " << budget_mb << " MB budget" << std::endl;
+    }
     return 0;
 }
 
@@ -102,6 +122,8 @@ int32_t Monolithic_renderer::Impl::Teardown_job::execute()
 {
     bool success{ true };
     success &= m_pimpl.wait_for_renderer_idle();
+    success &= gltf_loader::teardown_all_meshes();
+    success &= material_bank::teardown_all_materials();
     success &= m_pimpl.teardown_imgui();
     success &= m_pimpl.teardown_vulkan_renderer();
     success &= m_pimpl.teardown_window();
@@ -752,7 +774,6 @@ bool Monolithic_renderer::Impl::build_vulkan_renderer()
                                                m_v_physical_device,
                                                m_v_device,
                                                m_v_vma_allocator);
-    vk_util::init_immediate_submit_support()
     result &= build_vulkan_renderer__swapchain(m_v_surface,
                                                m_v_physical_device,
                                                m_v_device,
@@ -772,6 +793,9 @@ bool Monolithic_renderer::Impl::build_vulkan_renderer()
     result &= build_vulkan_renderer__retrieve_queues(vkb_device,
                                                      m_v_graphics_queue,
                                                      m_v_graphics_queue_family_idx);
+    vk_util::init_immediate_submit_support(m_immediate_submit_support,
+                                           m_v_device,
+                                           m_v_graphics_queue_family_idx);
     result &= build_vulkan_renderer__cmd_structures(m_v_graphics_queue_family_idx,
                                                     m_v_device,
                                                     m_frames);
@@ -888,6 +912,8 @@ bool Monolithic_renderer::Impl::teardown_vulkan_renderer()
                                                     m_v_sample_pass.descriptor_layout);
     result &= teardown_vulkan_renderer__sync_structures(m_v_device, m_frames);
     result &= teardown_vulkan_renderer__cmd_structures(m_v_device, m_frames);
+    vk_util::destroy_immediate_submit_support(m_immediate_submit_support,
+                                              m_v_device);
     result &= teardown_vulkan_renderer__hdr_image(m_v_vma_allocator,
                                                   m_v_device,
                                                   m_v_HDR_draw_image.image);
