@@ -3,6 +3,7 @@
 #include <atomic>
 #include <filesystem>
 #include <iostream>
+#include <limits>
 #include <vector>
 #include "cglm/cglm.h"
 // Fast gltf includes must be in this order. //
@@ -69,14 +70,14 @@ bool validate_vertex_attributes(const fgltf_attributes_t& attributes)
 
 }  // namespace gltf_loader
 
-gltf_loader::VertexInputDescription gltf_loader::GPU_vertex::get_static_vertex_description()
+gltf_loader::Vertex_input_description gltf_loader::GPU_vertex::get_static_vertex_description()
 {
     // @NOTE: This is only used for static vertices.
     //        All skinned/alembic vertices will be run thru a compute
     //        shader and inserted into this same vertex description.
     //        Skinned/alembic vertices are placed in a storage buffer instead
     //        (WARNING: storage buffers will have different memory padding rules)
-    static VertexInputDescription vertex_desc{
+    static Vertex_input_description vertex_desc{
         .bindings{
             VkVertexInputBindingDescription{
                 .binding = 0,
@@ -151,9 +152,6 @@ bool gltf_loader::load_gltf(const std::string& path_str)
 
     auto asset{ std::move(asset_expect.get()) };
 
-    // @TODO: load in the geometry, animations, and material names
-    // vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
-
     // Check that all desired vertex attributes are included.
     // @TODO: Remove this check section, since it will be checked below
     //        since most attribs (except for position) are optional.
@@ -188,9 +186,6 @@ bool gltf_loader::load_gltf(const std::string& path_str)
         mesh_mat_indexes.emplace_back(mesh_idx);
     }
 
-    // ~~Assign material id to each mesh.~~
-    // @DEPRECATED: material id's will be handled by the instance buffer.
-
     // Acquire base vertex atomically and lock.
     uint32_t base_vertex;
     uint32_t base_vertex_load;
@@ -200,15 +195,20 @@ bool gltf_loader::load_gltf(const std::string& path_str)
         base_vertex = base_vertex_load;
     } while (!s_indices_base_vertex.compare_exchange_weak(base_vertex_load, (uint32_t)-1));
 
-    // Mark base index with new model.
-    Model new_model{
-        .base_index = static_cast<uint32_t>(s_all_indices.size()),
-    };
-
     // @NOTE: Primitive index is the primitive num inside of each individual model.
     //        Used for finding which material to access within a material set.
     //        See `GPU_vertex`.
     size_t primitive_index{ 0 };
+
+    // Create a new model.
+    // Also, create an AABB to convert into a bounding sphere.
+    // @NOTE: The resulting bounding sphere is certainly going to be
+    //        larger than the AABB due to it being circumscribed.
+    Model new_model;
+    constexpr float_t k_lowest{ std::numeric_limits<float_t>::min() };
+    constexpr float_t k_highest{ std::numeric_limits<float_t>::max() };
+    vec3 min_pos{ k_highest, k_highest, k_highest };
+    vec3 max_pos{ k_lowest, k_lowest, k_lowest };
 
     // Load geometry into giant set of meshes.
     for (auto& mesh : asset.meshes)
@@ -253,6 +253,10 @@ bool gltf_loader::load_gltf(const std::string& path_str)
                 vert.pad0 = 0;
                 glm_vec2_zero(vert.uv);
                 glm_vec4_zero(vert.color);
+
+                // Work towards creating AABB.
+                glm_vec3_minv(min_pos, vec.raw, min_pos);
+                glm_vec3_maxv(max_pos, vec.raw, max_pos);
             });
 
             // Primitive index.
@@ -321,9 +325,15 @@ bool gltf_loader::load_gltf(const std::string& path_str)
 #endif  // IMPLEMENTED_ANIMATIONS
 
     // Create bounding sphere for meshes.
+    // @NOTE: simply circumscribes the resulting AABB.
+    vec3 bs_origin;
+    glm_vec3_add(min_pos, max_pos, bs_origin);
+    glm_vec3_scale(bs_origin, 0.5f, new_model.bounding_sphere.origin);
+    new_model.bounding_sphere.radius =
+        glm_vec3_distance(new_model.bounding_sphere.origin, max_pos);
 
 #if _DEBUG
-    // Give aabb score for mesh vs bounding sphere
+    // @TODO: Give aabb score for mesh vs bounding sphere
     // (make sure all 3 dimensions are as similar as possible so that occlusion check is easiest).
     // This just goes into the console or in a stats sheet for improving the assets.
     // There could also be something like a warning if the score is bad enough.

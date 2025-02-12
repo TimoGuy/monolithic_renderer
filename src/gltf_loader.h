@@ -13,14 +13,14 @@
 namespace gltf_loader
 {
 
-struct VertexInputDescription
+struct Vertex_input_description
 {
 #if _WIN64
     std::vector<VkVertexInputBindingDescription> bindings;
     std::vector<VkVertexInputAttributeDescription> attributes;
     VkPipelineVertexInputStateCreateFlags flags = 0;
 #else
-#error "`struct VertexInputDescription` requires new OS implementation."
+#error "`struct Vertex_input_description` requires new OS implementation."
 #endif  // _WIN64
 };
 
@@ -33,15 +33,8 @@ struct GPU_vertex
 	vec2     uv;
 	vec4     color;
 
-    static VertexInputDescription get_static_vertex_description();
+    static Vertex_input_description get_static_vertex_description();
 };
-
-// @TODO: @START HERE THEA
-// So essentially, I was spending a bunch of time trying to figure out how the gltf model was structured so that I could think about the best way to render them.
-// ~~I think that essentially having everything grouped by material first would be best.~~ Actually, I would say that the model artist should be in charge of material mesh optimization.
-// Having a skinned version that goes into an intermediate vertex buffer would be super good too.
-// Ummmmmm, I also think that having animations and stuff down to a tee would be good.
-// @TODO: look at how the animations are structured inside the gltf thingo in the solanine_vulkan project.
 
 struct Primitive
 {
@@ -50,9 +43,17 @@ struct Primitive
     uint32_t default_material_idx;
 };
 
+struct Bounding_sphere
+{
+    // @NOTE: This gets uploaded into the GPU
+    //        as simply a vec4.
+    vec3 origin;
+    float_t radius;
+};
+
 struct Model
 {
-    uint32_t base_index;
+    Bounding_sphere bounding_sphere;
     std::vector<Primitive> primitives;
 };
 
