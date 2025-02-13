@@ -6,21 +6,41 @@
 #include <vulkan/vulkan.h>
 
 
+// @NOTE: A material is only for the geometry pipelines.
 namespace material_bank
 {
 
-constexpr uint32_t k_invalid_material_idx{ (uint32_t)-1 };
-
-struct GPU_material  // @CHECK I think this would be what I need for making materials.
+struct GPU_pipeline
 {
-    // @TODO: ideally, there will be a set of materials but since there are parameters to
-    //        play with with each material (i.e. with pbr there's only one material but many many params to turn)
-    //        there needs to be some way to get material variants or material parameters in here while being customizable.
     VkPipeline pipeline;
     VkPipelineLayout pipeline_layout;
     std::vector<VkDescriptorSet> descriptor_sets;
 };
 
+constexpr uint32_t k_invalid_material_idx{ (uint32_t)-1 };
+
+struct GPU_material
+{
+    uint32_t pipeline_idx;
+    // @TODO: add different material param things for adding into the gpu.
+};
+
+struct GPU_material_set
+{
+    std::vector<uint32_t> material_indexes;
+};
+
+// Pipeline.
+uint32_t register_pipeline(const std::string& pipe_name,
+                           GPU_pipeline&& new_pipeline);
+
+uint32_t get_pipeline_idx_from_name(const std::string& pipe_name);
+
+const GPU_pipeline& get_pipeline(uint32_t idx);
+
+bool teardown_all_pipelines();
+
+// Material.
 uint32_t register_material(const std::string& mat_name,
                            GPU_material&& new_material);
 
@@ -29,5 +49,13 @@ uint32_t get_mat_idx_from_name(const std::string& mat_name);
 const GPU_material& get_material(uint32_t idx);
 
 bool teardown_all_materials();
+
+// Material set.
+uint32_t register_material_set(const std::string& mat_set_name,
+                               std::vector<uint32_t>&& new_material_set);
+
+uint32_t get_mat_set_idx_from_name(const std::string& mat_set_name);
+
+const GPU_material_set& get_material_set(uint32_t idx);
 
 }  // namespace material_bank

@@ -57,6 +57,8 @@ int32_t Monolithic_renderer::Impl::Build_job::execute()
 int32_t Monolithic_renderer::Impl::Load_assets_job::execute()
 {
     // @TODO: @THEA: add these material and model constructions into the actual soranin game as a constructor param.
+
+    // Materials.
     material_bank::register_material("Body", {});
     material_bank::register_material("Tights", {});
     material_bank::register_material("gold", {});
@@ -75,6 +77,40 @@ int32_t Monolithic_renderer::Impl::Load_assets_job::execute()
     material_bank::register_material("ribbed_tan", {});
     material_bank::register_material("knitting_green", {});
 
+    // Material sets.
+    material_bank::register_material_set(
+        "slime_girl_mat_set_0",
+        {
+            material_bank::get_mat_idx_from_name("gold"),
+            material_bank::get_mat_idx_from_name("slime_body"),
+            material_bank::get_mat_idx_from_name("clothing_tights"),
+            material_bank::get_mat_idx_from_name("slimegirl_eyebrows"),
+            material_bank::get_mat_idx_from_name("slimegirl_eyes"),
+            material_bank::get_mat_idx_from_name("slime_hair"),
+            material_bank::get_mat_idx_from_name("suede_white"),
+            material_bank::get_mat_idx_from_name("suede_gray"),
+            material_bank::get_mat_idx_from_name("rubber_black"),
+            material_bank::get_mat_idx_from_name("plastic_green"),
+            material_bank::get_mat_idx_from_name("denim"),
+            material_bank::get_mat_idx_from_name("leather"),
+            material_bank::get_mat_idx_from_name("corduroy_white"),
+            material_bank::get_mat_idx_from_name("plastic_green"),
+            material_bank::get_mat_idx_from_name("leather"),
+            material_bank::get_mat_idx_from_name("corduroy_white"),
+            material_bank::get_mat_idx_from_name("ribbed_tan"),
+            material_bank::get_mat_idx_from_name("leather"),
+            material_bank::get_mat_idx_from_name("gold"),
+        }
+    );
+    material_bank::register_material_set(
+        "enemy_wip_mat_set_0",
+        {
+            material_bank::get_mat_idx_from_name("Body"),
+            material_bank::get_mat_idx_from_name("Tights"),
+        }
+    );
+
+    // Models.
     gltf_loader::load_gltf("res/models/slime_girl.glb");
     gltf_loader::load_gltf("res/models/enemy_wip.glb");
     gltf_loader::load_gltf("res/models/box.gltf");

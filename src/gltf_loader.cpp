@@ -21,10 +21,12 @@ namespace gltf_loader
 
 // To fit all models into one buffer, using this vertex offset.
 static std::atomic_uint32_t s_indices_base_vertex{ 0 };
-static std::vector<uint32_t> s_all_indices;  // Use `s_indices_base_vertex` for visibility.
-static std::vector<GPU_vertex> s_all_vertices;  // Use `s_indices_base_vertex` for visibility.
-static std::vector<Model> s_all_models;  // Accessor into all indices.
+static std::vector<uint32_t> s_staging_indices;  // Use `s_indices_base_vertex` for visibility.
+static std::vector<GPU_vertex> s_staging_vertices;  // Use `s_indices_base_vertex` for visibility.
+static std::vector<Model> s_staging_models;  // Accessor into all indices.
+
 static vk_buffer::GPU_mesh_buffer s_static_mesh_buffer;  // Cooked buffer.
+static std::vector<Model> s_cooked_models;  // Accessor into all indices of cooked buffer.
 
 // glTF 2.0 attribute strings.
 constexpr const char* k_position_str{ "POSITION" };
@@ -220,17 +222,15 @@ bool gltf_loader::load_gltf(const std::string& path_str)
             asset.materials[primitive.materialIndex.value()].name };
 
         Primitive new_primitive{
-            .start_index = static_cast<uint32_t>(s_all_indices.size()),
-            .default_material_idx =
-                material_bank::get_mat_idx_from_name(material_name),
+            .start_index = static_cast<uint32_t>(s_staging_indices.size()),
         };
 
         // Load indices.
         {
             auto& accessor{ asset.accessors[primitive.indicesAccessor.value()] };
-            s_all_indices.reserve(s_all_indices.size() + accessor.count);
+            s_staging_indices.reserve(s_staging_indices.size() + accessor.count);
             fastgltf::iterateAccessor<uint32_t>(asset, accessor, [&](uint32_t idx) {
-                s_all_indices.emplace_back(base_vertex + idx);
+                s_staging_indices.emplace_back(base_vertex + idx);
             });
         }
 
@@ -241,12 +241,12 @@ bool gltf_loader::load_gltf(const std::string& path_str)
                 asset.accessors[primitive.findAttribute(k_position_str)->accessorIndex] };
 
             size_t num_new_vertices{ position_accessor.count };
-            s_all_vertices.resize(s_all_vertices.size() + num_new_vertices);
+            s_staging_vertices.resize(s_staging_vertices.size() + num_new_vertices);
 
             fastgltf::iterateAccessorWithIndex<vec3s>(asset,
                                                       position_accessor,
                                                       [&](vec3s vec, size_t index) {
-                auto& vert{ s_all_vertices[base_vertex + index] };
+                auto& vert{ s_staging_vertices[base_vertex + index] };
                 glm_vec3_copy(vec.raw, vert.position);
                 vert.primitive_idx = 0;
                 glm_vec3_zero(vert.normal);
@@ -261,7 +261,7 @@ bool gltf_loader::load_gltf(const std::string& path_str)
 
             // Primitive index.
             for (size_t index = 0; index < num_new_vertices; index++)
-                s_all_vertices[base_vertex + index].primitive_idx = primitive_index;
+                s_staging_vertices[base_vertex + index].primitive_idx = primitive_index;
 
             // Normal.
             auto normal_attribute{ primitive.findAttribute(k_normal_str) };
@@ -270,7 +270,7 @@ bool gltf_loader::load_gltf(const std::string& path_str)
                 fastgltf::iterateAccessorWithIndex<vec3s>(asset,
                                                         asset.accessors[normal_attribute->accessorIndex],
                                                         [&](vec3s vec, size_t index) {
-                    auto& vert{ s_all_vertices[base_vertex + index] };
+                    auto& vert{ s_staging_vertices[base_vertex + index] };
                     glm_vec3_copy(vec.raw, vert.normal);
                 });
             }
@@ -282,7 +282,7 @@ bool gltf_loader::load_gltf(const std::string& path_str)
                 fastgltf::iterateAccessorWithIndex<vec2s>(asset,
                                                         asset.accessors[uv_attribute->accessorIndex],
                                                         [&](vec2s vec, size_t index) {
-                    auto& vert{ s_all_vertices[base_vertex + index] };
+                    auto& vert{ s_staging_vertices[base_vertex + index] };
                     glm_vec2_copy(vec.raw, vert.uv);
                 });
             }
@@ -294,7 +294,7 @@ bool gltf_loader::load_gltf(const std::string& path_str)
                 fastgltf::iterateAccessorWithIndex<vec4s>(asset,
                                                         asset.accessors[color_attribute->accessorIndex],
                                                         [&](vec4s vec, size_t index) {
-                    auto& vert{ s_all_vertices[base_vertex + index] };
+                    auto& vert{ s_staging_vertices[base_vertex + index] };
                     glm_vec4_copy(vec.raw, vert.color);
                 });
             }
@@ -303,9 +303,9 @@ bool gltf_loader::load_gltf(const std::string& path_str)
         }
 
         primitive_index++;
-        base_vertex = s_all_vertices.size();
+        base_vertex = s_staging_vertices.size();
         new_primitive.index_count =
-            (s_all_indices.size() - new_primitive.start_index);
+            (s_staging_indices.size() - new_primitive.start_index);
         new_model.primitives.emplace_back(new_primitive);
     }
 
@@ -339,7 +339,7 @@ bool gltf_loader::load_gltf(const std::string& path_str)
     // There could also be something like a warning if the score is bad enough.
 #endif  // _DEBUG
 
-    s_all_models.emplace_back(new_model);
+    s_staging_models.emplace_back(new_model);
 
     // Release lock on loading new gltf models.
     s_indices_base_vertex.store(base_vertex);
@@ -369,18 +369,32 @@ bool gltf_loader::upload_combined_mesh(const vk_util::Immediate_submit_support& 
                                       device,
                                       queue,
                                       allocator,
-                                      std::move(s_all_indices),
-                                      std::move(s_all_vertices));
+                                      std::move(s_staging_indices),
+                                      std::move(s_staging_vertices));
+    s_cooked_models = std::move(s_staging_models);
 
     // Clear all cpu side buffers.
-    s_all_indices.clear();
-    s_all_vertices.clear();
-    s_all_models.clear();
+    s_staging_indices.clear();
+    s_staging_vertices.clear();
+    s_staging_models.clear();
 
     // Release lock on loading new gltf models.
     s_indices_base_vertex.store(0);
 
     return true;
+}
+
+const gltf_loader::Model& gltf_loader::get_model(uint32_t idx)
+{
+    if (s_indices_base_vertex == 0)
+    {
+        assert(!s_cooked_models.empty());
+        assert(idx < s_cooked_models.size());
+        return s_cooked_models[idx];
+    }
+
+    // If not finished cooking models, just vector.
+    return s_cooked_models[(size_t)-1];
 }
 
 bool gltf_loader::teardown_all_meshes()

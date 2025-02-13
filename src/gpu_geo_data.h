@@ -7,13 +7,15 @@
 namespace gpu_geo_data
 {
 
-struct GPU_start_count
+enum class Render_layer : uint32_t
 {
-    uint32_t start_index;
-    uint32_t index_count;
+    DEFAULT = 0,
+    INVISIBLE,
+    LEVEL_EDITOR,
+    NUM_RENDER_LAYERS
 };
 
-struct GPU_instance_data  // @TODO: rename to `GPU_geo_instance_data`
+struct GPU_geo_instance_data
 {
     mat4 transform = GLM_MAT4_IDENTITY_INIT;
     uint32_t bounding_sphere_idx;
@@ -29,7 +31,7 @@ struct GPU_bounding_sphere
 
 struct GPU_material_param_set_data
 {
-
+    // @TODO: figure out how to do this. Also, maybe do stuff????
 };
 
 // Have compute shader compute culling with all the bounding spheres write all the draw commands.

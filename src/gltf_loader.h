@@ -40,7 +40,6 @@ struct Primitive
 {
     uint32_t start_index;
     uint32_t index_count;
-    uint32_t default_material_idx;
 };
 
 struct Bounding_sphere
@@ -63,6 +62,8 @@ bool upload_combined_mesh(const vk_util::Immediate_submit_support& support,
                           VkDevice device,
                           VkQueue queue,
                           VmaAllocator allocator);
+
+const Model& get_model(uint32_t idx);
 
 bool teardown_all_meshes();
 
