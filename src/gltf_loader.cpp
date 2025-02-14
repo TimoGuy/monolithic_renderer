@@ -12,6 +12,7 @@
 #include "fastgltf/tools.hpp"
 #include "fastgltf/types.hpp"
 ///////////////////////////////////////////////
+#include "gpu_geo_data.h"
 #include "material_bank.h"
 #include "renderer_win64_vk_buffer.h"
 
@@ -27,6 +28,7 @@ static std::vector<Model> s_staging_models;  // Accessor into all indices.
 
 static vk_buffer::GPU_mesh_buffer s_static_mesh_buffer;  // Cooked buffer.
 static std::vector<Model> s_cooked_models;  // Accessor into all indices of cooked buffer.
+static std::vector<gpu_geo_data::GPU_bounding_sphere> s_cooked_bounding_spheres;
 
 // glTF 2.0 attribute strings.
 constexpr const char* k_position_str{ "POSITION" };
@@ -169,23 +171,19 @@ bool gltf_loader::load_gltf(const std::string& path_str)
         assert(false);
     }
 
-    // Check that all material names are valid.
-    std::vector<uint32_t> mesh_mat_indexes;
-    mesh_mat_indexes.reserve(asset.meshes.size());
+    // Emit warnings in case some material names are missing.
     for (auto& mesh : asset.meshes)
     for (auto& primitive : mesh.primitives)
     {
         std::string mat_name{ asset.materials[primitive.materialIndex.value()].name };
-        uint32_t mesh_idx{
+        uint32_t material_idx{
             material_bank::get_mat_idx_from_name(mat_name) };
-        if (mesh_idx == material_bank::k_invalid_material_idx)
+        if (material_idx == material_bank::k_invalid_material_idx)
         {
             std::cerr
-                << "ERROR: Validating material \"" << mat_name << "\" failed."
+                << "WARNING: Material \"" << mat_name << "\" not registered."
                 << std::endl;
-            return false;
         }
-        mesh_mat_indexes.emplace_back(mesh_idx);
     }
 
     // Acquire base vertex atomically and lock.
@@ -373,6 +371,24 @@ bool gltf_loader::upload_combined_mesh(const vk_util::Immediate_submit_support& 
                                       std::move(s_staging_vertices));
     s_cooked_models = std::move(s_staging_models);
 
+    // Move bounding sphere into bounding sphere struct.
+    s_cooked_bounding_spheres.clear();
+    s_cooked_bounding_spheres.reserve(s_cooked_models.size());
+    for (auto& model : s_cooked_models)
+    {
+        gpu_geo_data::GPU_bounding_sphere bs{
+            .origin_xyz_radius_w{
+                model.bounding_sphere.origin[0],
+                model.bounding_sphere.origin[1],
+                model.bounding_sphere.origin[2],
+                model.bounding_sphere.radius
+            }
+        };
+        s_cooked_bounding_spheres.emplace_back(bs);
+    }
+
+    assert(s_cooked_models.size() == s_cooked_bounding_spheres.size());
+
     // Clear all cpu side buffers.
     s_staging_indices.clear();
     s_staging_vertices.clear();
@@ -395,6 +411,25 @@ const gltf_loader::Model& gltf_loader::get_model(uint32_t idx)
 
     // If not finished cooking models, just vector.
     return s_cooked_models[(size_t)-1];
+}
+
+const gpu_geo_data::GPU_bounding_sphere& gltf_loader::get_bounding_sphere(uint32_t idx)
+{
+    if (s_indices_base_vertex == 0)
+    {
+        assert(!s_cooked_bounding_spheres.empty());
+        assert(idx < s_cooked_bounding_spheres.size());
+        return s_cooked_bounding_spheres[idx];
+    }
+
+    // If not finished cooking models, just vector.
+    return s_cooked_bounding_spheres[(size_t)-1];
+}
+
+uint32_t gltf_loader::get_model_and_bs_count()
+{
+    assert(s_cooked_models.size() == s_cooked_bounding_spheres.size());
+    return static_cast<uint32_t>(s_cooked_models.size());
 }
 
 bool gltf_loader::teardown_all_meshes()

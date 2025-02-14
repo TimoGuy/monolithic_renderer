@@ -12,6 +12,7 @@
 #include <cinttypes>
 #include <cstring>
 #include <iostream>
+#include "geo_instance.h"
 #include "gltf_loader.h"
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
@@ -58,24 +59,63 @@ int32_t Monolithic_renderer::Impl::Load_assets_job::execute()
 {
     // @TODO: @THEA: add these material and model constructions into the actual soranin game as a constructor param.
 
+    // Pipelines.
+    material_bank::register_pipeline("pbr_default", {});
+    material_bank::register_pipeline("pbr_cel_shaded", {});
+
     // Materials.
-    material_bank::register_material("Body", {});
-    material_bank::register_material("Tights", {});
-    material_bank::register_material("gold", {});
-    material_bank::register_material("slime_body", {});
-    material_bank::register_material("clothing_tights", {});
-    material_bank::register_material("slimegirl_eyebrows", {});
-    material_bank::register_material("slimegirl_eyes", {});
-    material_bank::register_material("slime_hair", {});
-    material_bank::register_material("suede_white", {});
-    material_bank::register_material("suede_gray", {});
-    material_bank::register_material("rubber_black", {});
-    material_bank::register_material("plastic_green", {});
-    material_bank::register_material("denim", {});
-    material_bank::register_material("leather", {});
-    material_bank::register_material("corduroy_white", {});
-    material_bank::register_material("ribbed_tan", {});
-    material_bank::register_material("knitting_green", {});
+    material_bank::register_material("Body", {
+        .pipeline_idx = material_bank::get_pipeline_idx_from_name("pbr_default"),
+    });
+    material_bank::register_material("Tights", {
+        .pipeline_idx = material_bank::get_pipeline_idx_from_name("pbr_default"),
+    });
+    material_bank::register_material("gold", {
+        .pipeline_idx = material_bank::get_pipeline_idx_from_name("pbr_default"),
+    });
+    material_bank::register_material("slime_body", {
+        .pipeline_idx = material_bank::get_pipeline_idx_from_name("pbr_cel_shaded"),
+    });
+    material_bank::register_material("clothing_tights", {
+        .pipeline_idx = material_bank::get_pipeline_idx_from_name("pbr_default"),
+    });
+    material_bank::register_material("slimegirl_eyebrows", {
+        .pipeline_idx = material_bank::get_pipeline_idx_from_name("pbr_default"),
+    });
+    material_bank::register_material("slimegirl_eyes", {
+        .pipeline_idx = material_bank::get_pipeline_idx_from_name("pbr_default"),
+    });
+    material_bank::register_material("slime_hair", {
+        .pipeline_idx = material_bank::get_pipeline_idx_from_name("pbr_cel_shaded"),
+    });
+    material_bank::register_material("suede_white", {
+        .pipeline_idx = material_bank::get_pipeline_idx_from_name("pbr_default"),
+    });
+    material_bank::register_material("suede_gray", {
+        .pipeline_idx = material_bank::get_pipeline_idx_from_name("pbr_default"),
+    });
+    material_bank::register_material("rubber_black", {
+        .pipeline_idx = material_bank::get_pipeline_idx_from_name("pbr_default"),
+    });
+    material_bank::register_material("plastic_green", {
+        .pipeline_idx = material_bank::get_pipeline_idx_from_name("pbr_default"),
+    });
+    material_bank::register_material("denim", {
+        .pipeline_idx = material_bank::get_pipeline_idx_from_name("pbr_default"),
+    });
+    material_bank::register_material("leather", {
+        .pipeline_idx = material_bank::get_pipeline_idx_from_name("pbr_default"),
+    });
+    material_bank::register_material("corduroy_white", {
+        .pipeline_idx = material_bank::get_pipeline_idx_from_name("pbr_default"),
+    });
+    material_bank::register_material("ribbed_tan", {
+        .pipeline_idx = material_bank::get_pipeline_idx_from_name("pbr_default"),
+    });
+    material_bank::register_material("knitting_green", {
+        .pipeline_idx = material_bank::get_pipeline_idx_from_name("pbr_default"),
+    });
+    material_bank::cook_all_material_param_indices();
 
     // Material sets.
     material_bank::register_material_set(
@@ -100,6 +140,7 @@ int32_t Monolithic_renderer::Impl::Load_assets_job::execute()
             material_bank::get_mat_idx_from_name("ribbed_tan"),
             material_bank::get_mat_idx_from_name("leather"),
             material_bank::get_mat_idx_from_name("gold"),
+            material_bank::get_mat_idx_from_name("knitting_green"),
         }
     );
     material_bank::register_material_set(
@@ -109,15 +150,59 @@ int32_t Monolithic_renderer::Impl::Load_assets_job::execute()
             material_bank::get_mat_idx_from_name("Tights"),
         }
     );
+    material_bank::register_material_set(
+        "box_mat_set_0",
+        {
+            material_bank::get_mat_idx_from_name("rubber_black"),
+        }
+    );
 
     // Models.
-    gltf_loader::load_gltf("res/models/slime_girl.glb");
+    gltf_loader::load_gltf("res/models/slime_girl.glb");  // @TODO: figure out way to string lookup models.
     gltf_loader::load_gltf("res/models/enemy_wip.glb");
     gltf_loader::load_gltf("res/models/box.gltf");
     gltf_loader::upload_combined_mesh(m_pimpl.m_immediate_submit_support,
                                       m_pimpl.m_v_device,
                                       m_pimpl.m_v_graphics_queue,
                                       m_pimpl.m_v_vma_allocator);
+
+    // @DEBUG: @NOCHECKIN: create some instances (for testing). //
+    geo_instance::register_geo_instance(geo_instance::Geo_instance{
+        .model_idx = 0,  // @TODO: figure out way to string lookup models.
+        .render_pass = geo_instance::Geo_render_pass::OPAQUE,
+        .is_shadow_caster = true,
+        .gpu_instance_data{
+            .material_param_set_idx = material_bank::get_mat_set_idx_from_name("slime_girl_mat_set_0")
+        },
+    });
+    geo_instance::register_geo_instance(geo_instance::Geo_instance{
+        .model_idx = 1,  // @TODO: figure out way to string lookup models.
+        .render_pass = geo_instance::Geo_render_pass::OPAQUE,
+        .is_shadow_caster = true,
+        .gpu_instance_data{
+            .material_param_set_idx = material_bank::get_mat_set_idx_from_name("enemy_wip_mat_set_0")
+        },
+    });
+    geo_instance::register_geo_instance(geo_instance::Geo_instance{
+        .model_idx = 2,  // @TODO: figure out way to string lookup models.
+        .render_pass = geo_instance::Geo_render_pass::OPAQUE,
+        .is_shadow_caster = true,
+        .gpu_instance_data{
+            .material_param_set_idx = material_bank::get_mat_set_idx_from_name("box_mat_set_0")
+        },
+    });
+    //////////////////////////////////////////////////////////////
+
+    // Upload material sets.
+
+    // Upload bounding sphere data.
+    uint32_t bs_count{ gltf_loader::get_model_and_bs_count() };
+    for (uint32_t i = 0; i < bs_count; i++)
+    {
+        //void* data;
+        //vmaMapMemory();
+        //vmaUnmapMemory();
+    }
 
     // Report memory heap usage.
     VmaBudget budgets[VK_MAX_MEMORY_HEAPS];
@@ -150,6 +235,7 @@ int32_t Monolithic_renderer::Impl::Update_data_job::execute()
 int32_t Monolithic_renderer::Impl::Render_job::execute()
 {
     bool success{ true };
+    success &= m_pimpl.update_and_upload_render_data();
     success &= m_pimpl.render();
     return success ? 0 : 1;
 }
@@ -1050,6 +1136,18 @@ bool Monolithic_renderer::Impl::update_window()
     glfwPollEvents();
 
     // @TODO
+
+    return true;
+}
+
+bool Monolithic_renderer::Impl::update_and_upload_render_data()
+{
+    // Update.
+    geo_instance::rebuild_bucketed_instance_list_array();
+
+    // Upload.
+    // @TODO: implement.
+    assert(false);
 
     return true;
 }

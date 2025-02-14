@@ -201,6 +201,7 @@ private:
 
     // Tick procedures.
     bool update_window();
+    bool update_and_upload_render_data();
     bool render();
     bool render__imgui();
 

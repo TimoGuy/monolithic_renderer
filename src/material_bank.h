@@ -23,6 +23,9 @@ struct GPU_material
 {
     uint32_t pipeline_idx;
     // @TODO: add different material param things for adding into the gpu.
+
+    // Local index within the group of materials using a pipeline.
+    uint32_t cooked_material_param_local_idx;
 };
 
 struct GPU_material_set
@@ -43,6 +46,8 @@ bool teardown_all_pipelines();
 // Material.
 uint32_t register_material(const std::string& mat_name,
                            GPU_material&& new_material);
+
+bool cook_all_material_param_indices();
 
 uint32_t get_mat_idx_from_name(const std::string& mat_name);
 

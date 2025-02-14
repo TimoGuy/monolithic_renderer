@@ -21,8 +21,8 @@ namespace geo_instance
 // Access the bucket by: Geo render pass and then Pipeline idx.
 struct Instance_primitive
 {
-    Geo_instance* instance;
-    gltf_loader::Primitive* primitive;
+    const Geo_instance* instance;
+    const gltf_loader::Primitive* primitive;
 };
 
 using Primitive_list_t = std::vector<Instance_primitive>;
@@ -51,6 +51,8 @@ geo_instance::Geo_instance_key_t geo_instance::register_geo_instance(Geo_instanc
     // @NOTE: registering a geo instance should never happen at
     //        the same time as rebucketing.
     assert(!s_currently_rebucketing);
+
+    new_instance.gpu_instance_data.bounding_sphere_idx = new_instance.model_idx;
 
     // @INCOMPLETE: change the implementation to a geo instance pool.
     Geo_instance_key_t new_instance_idx{ s_current_register_idx++ };
@@ -91,6 +93,8 @@ void geo_instance::rebuild_bucketed_instance_list_array()
         auto& material_set{
             material_bank::get_material_set(instance.gpu_instance_data.material_param_set_idx) };
         
+        // @NOTE: assert that the model's number of materials matches the number
+        //        of materials in the material set.
         assert(model.primitives.size() == material_set.material_indexes.size());
 
         for (size_t i = 0; i < model.primitives.size(); i++)

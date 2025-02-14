@@ -92,6 +92,23 @@ uint32_t material_bank::register_material(const std::string& mat_name,
     return emplace_idx;
 }
 
+bool material_bank::cook_all_material_param_indices()
+{
+    std::lock_guard<std::mutex> lock1{ s_all_pipelines_mutex };
+    std::lock_guard<std::mutex> lock2{ s_all_materials_mutex };
+
+    std::vector<uint32_t> local_mat_counts;
+    local_mat_counts.resize(s_all_pipelines.size(), 0);
+
+    for (auto& material : s_all_materials)
+    {
+        uint32_t local_idx{ local_mat_counts[material.pipeline_idx]++ };
+        material.cooked_material_param_local_idx = local_idx;
+    }
+
+    return true;
+}
+
 uint32_t material_bank::get_mat_idx_from_name(const std::string& mat_name)
 {
     std::lock_guard<std::mutex> lock{ s_mat_name_to_idx_mutex };

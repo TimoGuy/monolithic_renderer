@@ -7,6 +7,7 @@
 #include <vk_mem_alloc.h>
 #endif  // _WIN64
 #include "cglm/cglm.h"
+#include "gpu_geo_data.h"
 #include "renderer_win64_vk_immediate_submit.h"
 
 
@@ -64,6 +65,10 @@ bool upload_combined_mesh(const vk_util::Immediate_submit_support& support,
                           VmaAllocator allocator);
 
 const Model& get_model(uint32_t idx);
+
+const gpu_geo_data::GPU_bounding_sphere& get_bounding_sphere(uint32_t idx);
+
+uint32_t get_model_and_bs_count();
 
 bool teardown_all_meshes();
 
