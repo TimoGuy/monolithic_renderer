@@ -66,9 +66,7 @@ bool upload_combined_mesh(const vk_util::Immediate_submit_support& support,
 
 const Model& get_model(uint32_t idx);
 
-const gpu_geo_data::GPU_bounding_sphere& get_bounding_sphere(uint32_t idx);
-
-uint32_t get_model_and_bs_count();
+const std::vector<gpu_geo_data::GPU_bounding_sphere>& get_all_bounding_spheres();
 
 bool teardown_all_meshes();
 

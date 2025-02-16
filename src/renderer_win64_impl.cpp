@@ -21,6 +21,7 @@
 #include "multithreaded_job_system_public.h"
 #include "renderer_win64_vk_pipeline_builder.h"
 #include "renderer_win64_vk_util.h"
+#include "timing_reporter_public.h"
 
 
 // For extern symbol.
@@ -60,10 +61,13 @@ int32_t Monolithic_renderer::Impl::Load_assets_job::execute()
     // @TODO: @THEA: add these material and model constructions into the actual soranin game as a constructor param.
 
     // Pipelines.
+    TIMING_REPORT_START(reg_pipes);
     material_bank::register_pipeline("pbr_default", {});
     material_bank::register_pipeline("pbr_cel_shaded", {});
+    TIMING_REPORT_END_AND_PRINT(reg_pipes, "Register Pipelines: ");
 
     // Materials.
+    TIMING_REPORT_START(reg_mats);
     material_bank::register_material("Body", {
         .pipeline_idx = material_bank::get_pipeline_idx_from_name("pbr_default"),
     });
@@ -116,48 +120,58 @@ int32_t Monolithic_renderer::Impl::Load_assets_job::execute()
         .pipeline_idx = material_bank::get_pipeline_idx_from_name("pbr_default"),
     });
     material_bank::cook_all_material_param_indices();
+    TIMING_REPORT_END_AND_PRINT(reg_mats, "Register and Cook Materials: ");
 
     // Material sets.
+    TIMING_REPORT_START(reg_mat_sets);
     material_bank::register_material_set(
         "slime_girl_mat_set_0",
-        {
-            material_bank::get_mat_idx_from_name("gold"),
-            material_bank::get_mat_idx_from_name("slime_body"),
-            material_bank::get_mat_idx_from_name("clothing_tights"),
-            material_bank::get_mat_idx_from_name("slimegirl_eyebrows"),
-            material_bank::get_mat_idx_from_name("slimegirl_eyes"),
-            material_bank::get_mat_idx_from_name("slime_hair"),
-            material_bank::get_mat_idx_from_name("suede_white"),
-            material_bank::get_mat_idx_from_name("suede_gray"),
-            material_bank::get_mat_idx_from_name("rubber_black"),
-            material_bank::get_mat_idx_from_name("plastic_green"),
-            material_bank::get_mat_idx_from_name("denim"),
-            material_bank::get_mat_idx_from_name("leather"),
-            material_bank::get_mat_idx_from_name("corduroy_white"),
-            material_bank::get_mat_idx_from_name("plastic_green"),
-            material_bank::get_mat_idx_from_name("leather"),
-            material_bank::get_mat_idx_from_name("corduroy_white"),
-            material_bank::get_mat_idx_from_name("ribbed_tan"),
-            material_bank::get_mat_idx_from_name("leather"),
-            material_bank::get_mat_idx_from_name("gold"),
-            material_bank::get_mat_idx_from_name("knitting_green"),
+        material_bank::GPU_material_set{
+            {
+                material_bank::get_mat_idx_from_name("gold"),
+                material_bank::get_mat_idx_from_name("slime_body"),
+                material_bank::get_mat_idx_from_name("clothing_tights"),
+                material_bank::get_mat_idx_from_name("slimegirl_eyebrows"),
+                material_bank::get_mat_idx_from_name("slimegirl_eyes"),
+                material_bank::get_mat_idx_from_name("slime_hair"),
+                material_bank::get_mat_idx_from_name("suede_white"),
+                material_bank::get_mat_idx_from_name("suede_gray"),
+                material_bank::get_mat_idx_from_name("rubber_black"),
+                material_bank::get_mat_idx_from_name("plastic_green"),
+                material_bank::get_mat_idx_from_name("denim"),
+                material_bank::get_mat_idx_from_name("leather"),
+                material_bank::get_mat_idx_from_name("corduroy_white"),
+                material_bank::get_mat_idx_from_name("plastic_green"),
+                material_bank::get_mat_idx_from_name("leather"),
+                material_bank::get_mat_idx_from_name("corduroy_white"),
+                material_bank::get_mat_idx_from_name("ribbed_tan"),
+                material_bank::get_mat_idx_from_name("leather"),
+                material_bank::get_mat_idx_from_name("gold"),
+                material_bank::get_mat_idx_from_name("knitting_green"),
+            }
         }
     );
     material_bank::register_material_set(
         "enemy_wip_mat_set_0",
-        {
-            material_bank::get_mat_idx_from_name("Body"),
-            material_bank::get_mat_idx_from_name("Tights"),
+        material_bank::GPU_material_set{
+            {
+                material_bank::get_mat_idx_from_name("Body"),
+                material_bank::get_mat_idx_from_name("Tights"),
+            }
         }
     );
     material_bank::register_material_set(
         "box_mat_set_0",
-        {
-            material_bank::get_mat_idx_from_name("rubber_black"),
+        material_bank::GPU_material_set{
+            {
+                material_bank::get_mat_idx_from_name("rubber_black"),
+            }
         }
     );
+    TIMING_REPORT_END_AND_PRINT(reg_mat_sets, "Register Material Sets: ");
 
     // Models.
+    TIMING_REPORT_START(upload_combined_mesh);
     gltf_loader::load_gltf("res/models/slime_girl.glb");  // @TODO: figure out way to string lookup models.
     gltf_loader::load_gltf("res/models/enemy_wip.glb");
     gltf_loader::load_gltf("res/models/box.gltf");
@@ -165,6 +179,7 @@ int32_t Monolithic_renderer::Impl::Load_assets_job::execute()
                                       m_pimpl.m_v_device,
                                       m_pimpl.m_v_graphics_queue,
                                       m_pimpl.m_v_vma_allocator);
+    TIMING_REPORT_END_AND_PRINT(upload_combined_mesh, "Load All Models and Upload Combined Mesh: ");
 
     // @DEBUG: @NOCHECKIN: create some instances (for testing). //
     geo_instance::register_geo_instance(geo_instance::Geo_instance{
@@ -193,9 +208,24 @@ int32_t Monolithic_renderer::Impl::Load_assets_job::execute()
     });
     //////////////////////////////////////////////////////////////
 
+    // Upload material param indices.
+    TIMING_REPORT_START(upload_material_param_indices);
+        // @TODO: implement!
+    TIMING_REPORT_END_AND_PRINT(upload_material_param_indices, "Upload Material Parameter Indices: ");
+
     // Upload material sets.
+    TIMING_REPORT_START(upload_material_sets);
+    uint32_t bs_count{ material_bank::getget_model_and_bs_count() };
+    for (uint32_t i = 0; i < bs_count; i++)
+    {
+        //void* data;
+        //vmaMapMemory();
+        //vmaUnmapMemory();
+    }
+    TIMING_REPORT_END_AND_PRINT(upload_material_sets, "Upload Material Sets: ");
 
     // Upload bounding sphere data.
+    TIMING_REPORT_START(upload_bs);
     uint32_t bs_count{ gltf_loader::get_model_and_bs_count() };
     for (uint32_t i = 0; i < bs_count; i++)
     {
@@ -203,6 +233,7 @@ int32_t Monolithic_renderer::Impl::Load_assets_job::execute()
         //vmaMapMemory();
         //vmaUnmapMemory();
     }
+    TIMING_REPORT_END_AND_PRINT(upload_bs, "Upload Bounding Spheres: ");
 
     // Report memory heap usage.
     VmaBudget budgets[VK_MAX_MEMORY_HEAPS];
@@ -472,7 +503,7 @@ bool build_vulkan_renderer__vulkan(GLFWwindow* window,
     out_physical_device_properties = physical_device.properties;
 
     // Print phsyical device properties.
-    std::cout << "[Chosen Physical Device Properties]" << std::endl;
+    std::cout << "-=-=- Chosen Physical Device Properties -=-=-" << std::endl;
     std::cout << "API_VERSION                          " << VK_API_VERSION_MAJOR(out_physical_device_properties.apiVersion) << "." << VK_API_VERSION_MINOR(out_physical_device_properties.apiVersion) << "." << VK_API_VERSION_PATCH(out_physical_device_properties.apiVersion) << "." << VK_API_VERSION_VARIANT(out_physical_device_properties.apiVersion) << std::endl;
     std::cout << "DRIVER_VERSION                       " << out_physical_device_properties.driverVersion << std::endl;
     std::cout << "VENDOR_ID                            " << out_physical_device_properties.vendorID << std::endl;
@@ -881,6 +912,9 @@ bool build_vulkan_renderer__triangle_graphic_pipeline(VkDevice device,
 bool Monolithic_renderer::Impl::build_vulkan_renderer()
 {
     bool result{ true };
+
+    TIMING_REPORT_START(build_vulkan_renderer);
+
     vkb::Device vkb_device;
     result &= build_vulkan_renderer__vulkan(m_window,
                                             m_v_instance,
@@ -936,6 +970,9 @@ bool Monolithic_renderer::Impl::build_vulkan_renderer()
                                                                m_v_HDR_draw_image.image.image_format,
                                                                m_v_sample_graphics_pass.pipeline_layout,
                                                                m_v_sample_graphics_pass.pipeline);
+
+    TIMING_REPORT_END_AND_PRINT(build_vulkan_renderer, "Build Vulkan Renderer: ");
+
     return result;
 }
 

@@ -7,6 +7,7 @@
 #include <vector>
 #include "gltf_loader.h"
 #include "material_bank.h"
+#include "timing_reporter_public.h"
 
 
 // @THEA: This should be enough information to get to the point where you have a functioning material system.
@@ -41,7 +42,7 @@ static std::atomic_bool s_currently_rebucketing{ false };
 constexpr size_t k_num_instances{ 1024 };
 static std::array<Geo_instance, k_num_instances> s_all_instances;
 static std::atomic_uint32_t s_current_register_idx{ 0 };
-/////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
 }  // namespace geo_instance
 
@@ -78,6 +79,8 @@ void geo_instance::rebuild_bucketed_instance_list_array()
     s_currently_rebucketing = true;
 #endif  // _DEBUG
 
+    TIMING_REPORT_START(rebucket);
+
     // Rebucket.
     for (auto& instance_list_map : s_bucketed_instance_primitives_list)  // @CHECK: does a mem leak happen here?????
     {
@@ -109,6 +112,8 @@ void geo_instance::rebuild_bucketed_instance_list_array()
         }
     }
     ////////////////////////////////////
+
+    TIMING_REPORT_END_AND_PRINT(rebucket, "Instance List Array Rebucket: ");
 
     // End process.
 #if _DEBUG

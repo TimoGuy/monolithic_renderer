@@ -350,8 +350,7 @@ bool gltf_loader::upload_combined_mesh(const vk_util::Immediate_submit_support& 
                                        VkQueue queue,
                                        VmaAllocator allocator)
 {
-    // Acquire base vertex atomically and lock.
-    // @COPYPASTA
+    // Acquire base vertex atomically and lock. (@COPYPASTA)
     uint32_t base_vertex;
     uint32_t base_vertex_load;
     do
@@ -371,7 +370,7 @@ bool gltf_loader::upload_combined_mesh(const vk_util::Immediate_submit_support& 
                                       std::move(s_staging_vertices));
     s_cooked_models = std::move(s_staging_models);
 
-    // Move bounding sphere into bounding sphere struct.
+    // Move bounding spheres into bounding sphere structs.
     s_cooked_bounding_spheres.clear();
     s_cooked_bounding_spheres.reserve(s_cooked_models.size());
     for (auto& model : s_cooked_models)
@@ -413,23 +412,16 @@ const gltf_loader::Model& gltf_loader::get_model(uint32_t idx)
     return s_cooked_models[(size_t)-1];
 }
 
-const gpu_geo_data::GPU_bounding_sphere& gltf_loader::get_bounding_sphere(uint32_t idx)
+const std::vector<gpu_geo_data::GPU_bounding_sphere>& gltf_loader::get_all_bounding_spheres()
 {
     if (s_indices_base_vertex == 0)
     {
         assert(!s_cooked_bounding_spheres.empty());
-        assert(idx < s_cooked_bounding_spheres.size());
-        return s_cooked_bounding_spheres[idx];
+        return s_cooked_bounding_spheres;
     }
 
     // If not finished cooking models, just vector.
-    return s_cooked_bounding_spheres[(size_t)-1];
-}
-
-uint32_t gltf_loader::get_model_and_bs_count()
-{
-    assert(s_cooked_models.size() == s_cooked_bounding_spheres.size());
-    return static_cast<uint32_t>(s_cooked_models.size());
+    assert(false);
 }
 
 bool gltf_loader::teardown_all_meshes()

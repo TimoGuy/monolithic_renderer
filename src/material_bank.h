@@ -57,7 +57,7 @@ bool teardown_all_materials();
 
 // Material set.
 uint32_t register_material_set(const std::string& mat_set_name,
-                               std::vector<uint32_t>&& new_material_set);
+                               GPU_material_set&& new_material_set);
 
 uint32_t get_mat_set_idx_from_name(const std::string& mat_set_name);
 

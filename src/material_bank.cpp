@@ -137,7 +137,7 @@ bool material_bank::teardown_all_materials()
 
 // Material set.
 uint32_t material_bank::register_material_set(const std::string& mat_set_name,
-                                              std::vector<uint32_t>&& new_material_set)
+                                              GPU_material_set&& new_material_set)
 {
     size_t emplace_idx;
     {
