@@ -46,7 +46,7 @@ GPU_mesh_buffer upload_mesh_to_gpu(const vk_util::Immediate_submit_support& supp
                                    std::vector<uint32_t>&& indices,
                                    std::vector<GPU_vertex>&& vertices);
 
-struct GPU_geo_resource_buffer  // @TODO: START HERE: figure out where to store the GPU_geo_resource_buffer and create stuff there. Probably material bank. Tho the bounding sphere buffer kinda doesn't make sense. Idkkkkkk
+struct GPU_geo_resource_buffer
 {
     Allocated_buffer material_param_index_buffer;
     Allocated_buffer material_param_set_buffer;
@@ -59,14 +59,14 @@ bool upload_material_param_sets_to_gpu(GPU_geo_resource_buffer& out_resources,
                                        VkDevice device,
                                        VkQueue queue,
                                        VmaAllocator allocator,
-                                       const material_bank::GPU_material_set& all_material_param_sets);
+                                       const std::vector<material_bank::GPU_material_set>& all_material_sets);
 
 bool upload_bounding_spheres_to_gpu(GPU_geo_resource_buffer& out_resources,
                                     const vk_util::Immediate_submit_support& support,
                                     VkDevice device,
                                     VkQueue queue,
                                     VmaAllocator allocator,
-                                    const gpu_geo_data::GPU_bounding_sphere& all_bounding_spheres);
+                                    const std::vector<gpu_geo_data::GPU_bounding_sphere>& all_bounding_spheres);
 
 struct GPU_geo_per_frame_buffer
 {

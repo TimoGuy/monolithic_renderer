@@ -170,3 +170,9 @@ const material_bank::GPU_material_set& material_bank::get_material_set(uint32_t 
     assert(idx < s_all_material_sets.size());
     return s_all_material_sets[idx];
 }
+
+const std::vector<material_bank::GPU_material_set>& material_bank::get_all_material_sets()
+{
+    std::lock_guard<std::mutex> lock{ s_all_material_sets_mutex };
+    return s_all_material_sets;
+}

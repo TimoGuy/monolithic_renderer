@@ -64,7 +64,7 @@ int32_t Monolithic_renderer::Impl::Load_assets_job::execute()
     TIMING_REPORT_START(reg_pipes);
     material_bank::register_pipeline("pbr_default", {});
     material_bank::register_pipeline("pbr_cel_shaded", {});
-    TIMING_REPORT_END_AND_PRINT(reg_pipes, "Register Pipelines: ");
+    TIMING_REPORT_END_AND_PRINT(reg_pipes, "Register Material Pipelines: ");
 
     // Materials.
     TIMING_REPORT_START(reg_mats);
@@ -208,31 +208,24 @@ int32_t Monolithic_renderer::Impl::Load_assets_job::execute()
     });
     //////////////////////////////////////////////////////////////
 
-    // Upload material param indices.
-    TIMING_REPORT_START(upload_material_param_indices);
-        // @TODO: implement!
-    TIMING_REPORT_END_AND_PRINT(upload_material_param_indices, "Upload Material Parameter Indices: ");
-
-    // Upload material sets.
+    // Upload material param indices and material sets.
     TIMING_REPORT_START(upload_material_sets);
-    uint32_t bs_count{ material_bank::getget_model_and_bs_count() };
-    for (uint32_t i = 0; i < bs_count; i++)
-    {
-        //void* data;
-        //vmaMapMemory();
-        //vmaUnmapMemory();
-    }
-    TIMING_REPORT_END_AND_PRINT(upload_material_sets, "Upload Material Sets: ");
+    vk_buffer::upload_material_param_sets_to_gpu(m_pimpl.m_v_geo_resource_buffer,
+                                                 m_pimpl.m_immediate_submit_support,
+                                                 m_pimpl.m_v_device,
+                                                 m_pimpl.m_v_graphics_queue,
+                                                 m_pimpl.m_v_vma_allocator,
+                                                 material_bank::get_all_material_sets());
+    TIMING_REPORT_END_AND_PRINT(upload_material_sets, "Upload Material Param Indices and Material Sets: ");
 
     // Upload bounding sphere data.
     TIMING_REPORT_START(upload_bs);
-    uint32_t bs_count{ gltf_loader::get_model_and_bs_count() };
-    for (uint32_t i = 0; i < bs_count; i++)
-    {
-        //void* data;
-        //vmaMapMemory();
-        //vmaUnmapMemory();
-    }
+    vk_buffer::upload_bounding_spheres_to_gpu(m_pimpl.m_v_geo_resource_buffer,
+                                              m_pimpl.m_immediate_submit_support,
+                                              m_pimpl.m_v_device,
+                                              m_pimpl.m_v_graphics_queue,
+                                              m_pimpl.m_v_vma_allocator,
+                                              gltf_loader::get_all_bounding_spheres());
     TIMING_REPORT_END_AND_PRINT(upload_bs, "Upload Bounding Spheres: ");
 
     // Report memory heap usage.
@@ -1184,6 +1177,7 @@ bool Monolithic_renderer::Impl::update_and_upload_render_data()
 
     // Upload.
     // @TODO: implement.
+    // @TODO: START HERE!!!! make the `create_per_frame_data_buffer()` function that runs once. Then, clear and set up data to insert into it here. (or maybe recreate the buffer whne the number of instances changes. Or maybe set a hard limit on the number of instances allowed.)
     assert(false);
 
     return true;

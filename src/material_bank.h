@@ -63,4 +63,6 @@ uint32_t get_mat_set_idx_from_name(const std::string& mat_set_name);
 
 const GPU_material_set& get_material_set(uint32_t idx);
 
+const std::vector<GPU_material_set>& get_all_material_sets();
+
 }  // namespace material_bank

@@ -14,6 +14,7 @@
 #include <cinttypes>
 #include <cstring>
 #include <iostream>
+#include "renderer_win64_vk_buffer.h"
 #include "renderer_win64_vk_descriptor_layout_builder.h"
 #include "renderer_win64_vk_image.h"
 #include "renderer_win64_vk_immediate_submit.h"
@@ -243,6 +244,8 @@ private:
         vk_image::Allocated_image image;
         VkExtent2D                extent;
     } m_v_HDR_draw_image;
+
+    vk_buffer::GPU_geo_resource_buffer m_v_geo_resource_buffer;
 
     struct Sample_pass
     {
