@@ -2,6 +2,7 @@
 
 #if _WIN64
 
+#include <atomic>
 #include <vulkan/vulkan.h>
 #include <vk_mem_alloc.h>
 #include <vector>
@@ -31,6 +32,15 @@ Allocated_buffer create_buffer(VmaAllocator allocator,
 
 void destroy_buffer(VmaAllocator allocator,
                     const Allocated_buffer& buffer);
+
+bool expand_buffer(const vk_util::Immediate_submit_support& support,
+                   VkDevice device,
+                   VkQueue queue,
+                   VmaAllocator allocator,
+                   Allocated_buffer& in_out_buffer,
+                   size_t new_size,
+                   VkBufferUsageFlags usage,
+                   VmaMemoryUsage memory_usage);
 
 struct GPU_mesh_buffer
 {
@@ -71,8 +81,30 @@ bool upload_bounding_spheres_to_gpu(GPU_geo_resource_buffer& out_resources,
 struct GPU_geo_per_frame_buffer
 {
     Allocated_buffer instance_data_buffer;
+    std::atomic_size_t num_instance_data_elems{ 0 };
+    std::atomic_size_t num_instance_data_elem_capacity{ 0 };
     Allocated_buffer indirect_command_buffer;
+    Allocated_buffer culled_indirect_command_buffer;
+    std::atomic_size_t num_indirect_cmd_elems{ 0 };
+    std::atomic_size_t num_indirect_cmd_elem_capacity{ 0 };
+    const size_t expand_elems_interval{ 1024 };
+    std::atomic_bool changed_indices_used{ true };
 };
+
+void initialize_base_sized_per_frame_buffer(VmaAllocator allocator,
+                                            GPU_geo_per_frame_buffer& frame_buffer);
+
+// @NOTE: Returns false if the previous requested change did not finish
+//        propagating to all the frames. False means "try again later".
+bool set_new_changed_indices(std::vector<uint32_t>&& changed_indices,
+                             std::vector<GPU_geo_per_frame_buffer*>& all_per_frame_buffers);
+
+void upload_changed_per_frame_data(const vk_util::Immediate_submit_support& support,
+                                   VkDevice device,
+                                   VkQueue queue,
+                                   VmaAllocator allocator,
+                                   GPU_geo_per_frame_buffer& frame_buffer);
+
 
 }  // namespace vk_buffer
 

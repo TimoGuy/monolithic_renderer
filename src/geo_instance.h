@@ -2,7 +2,9 @@
 
 #include <cinttypes>
 #include "cglm/cglm.h"
+#include "gltf_loader.h"
 #include "gpu_geo_data.h"
+#include "renderer_win64_vk_buffer.h"
 
 
 namespace geo_instance
@@ -32,6 +34,8 @@ Geo_instance_key_t register_geo_instance(Geo_instance&& new_instance);
 
 void unregister_geo_instance(Geo_instance_key_t key);
 
-void rebuild_bucketed_instance_list_array();
+void rebuild_bucketed_instance_list_array(std::vector<vk_buffer::GPU_geo_per_frame_buffer*>& all_per_frame_buffers);
+
+std::vector<const geo_instance::Geo_instance*> get_all_instances();
 
 }  // namespace geo_instance

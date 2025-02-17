@@ -41,6 +41,7 @@ static std::atomic_bool s_currently_rebucketing{ false };
 // @INCOMPLETE: Use a pool instead of a array here but that's for the future. //
 constexpr size_t k_num_instances{ 1024 };
 static std::array<Geo_instance, k_num_instances> s_all_instances;
+static std::vector<uint32_t> s_changed_inst_indices;
 static std::atomic_uint32_t s_current_register_idx{ 0 };
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -59,6 +60,7 @@ geo_instance::Geo_instance_key_t geo_instance::register_geo_instance(Geo_instanc
     Geo_instance_key_t new_instance_idx{ s_current_register_idx++ };
     assert(new_instance_idx < k_num_instances);
     s_all_instances[new_instance_idx] = std::move(new_instance);
+    s_changed_inst_indices.emplace_back(new_instance_idx);
     /////////////////////////////////////////////////////////////////
 
     s_flag_rebucketing = true;
@@ -71,15 +73,20 @@ void geo_instance::unregister_geo_instance(Geo_instance_key_t key)
     assert(false);
 }
 
-void geo_instance::rebuild_bucketed_instance_list_array()
+void geo_instance::rebuild_bucketed_instance_list_array(std::vector<vk_buffer::GPU_geo_per_frame_buffer*>& all_per_frame_buffers)
 {
-    if (!s_flag_rebucketing)
+    if (s_flag_rebucketing)
         return;
 #if _DEBUG
     s_currently_rebucketing = true;
 #endif  // _DEBUG
 
     TIMING_REPORT_START(rebucket);
+
+    // Insert built up changed instance indices.
+    vk_buffer::set_new_changed_indices(std::move(s_changed_inst_indices),
+                                       all_per_frame_buffers);
+    s_changed_inst_indices = std::vector<uint32_t>();
 
     // Rebucket.
     for (auto& instance_list_map : s_bucketed_instance_primitives_list)  // @CHECK: does a mem leak happen here?????
@@ -120,4 +127,32 @@ void geo_instance::rebuild_bucketed_instance_list_array()
     s_currently_rebucketing = false;
 #endif  // _DEBUG
     s_flag_rebucketing = false;
+}
+
+std::vector<const geo_instance::Geo_instance*> geo_instance::get_all_instances()
+{
+    std::vector<const geo_instance::Geo_instance*> instances;
+
+    if (!s_flag_rebucketing)
+    {
+        // @INCOMPLETE: asdfasdfasdfasdfasdf
+        uint32_t count{ s_current_register_idx };
+        instances.reserve(count);
+        for (auto& render_pass : s_bucketed_instance_primitives_list)
+        for (auto it = render_pass.begin(); it != render_pass.end(); it++)
+        for (auto& instance_primitive : it->second)
+        {
+            // @FIXME: @NOCHECKIN: @TODO: @CHECK: It seems like this will duplicate instances, since it's grouped with primitives.
+            // @THINK: Take a step back and think!!!!!! I think this is on the right track but wrong in places.
+            instances.emplace_back(instance_primitive.instance);
+        }
+
+        // for (uint32_t i = 0; i < count; i++)
+        // {
+        //     instances.emplace_back(&s_all_instances[i]);
+        // }
+        ////////////////////////////////////
+    }
+
+    return instances;
 }

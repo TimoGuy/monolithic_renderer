@@ -210,7 +210,7 @@ int32_t Monolithic_renderer::Impl::Load_assets_job::execute()
 
     // Upload material param indices and material sets.
     TIMING_REPORT_START(upload_material_sets);
-    vk_buffer::upload_material_param_sets_to_gpu(m_pimpl.m_v_geo_resource_buffer,
+    vk_buffer::upload_material_param_sets_to_gpu(m_pimpl.m_v_geo_passes_resource_buffer,
                                                  m_pimpl.m_immediate_submit_support,
                                                  m_pimpl.m_v_device,
                                                  m_pimpl.m_v_graphics_queue,
@@ -220,7 +220,7 @@ int32_t Monolithic_renderer::Impl::Load_assets_job::execute()
 
     // Upload bounding sphere data.
     TIMING_REPORT_START(upload_bs);
-    vk_buffer::upload_bounding_spheres_to_gpu(m_pimpl.m_v_geo_resource_buffer,
+    vk_buffer::upload_bounding_spheres_to_gpu(m_pimpl.m_v_geo_passes_resource_buffer,
                                               m_pimpl.m_immediate_submit_support,
                                               m_pimpl.m_v_device,
                                               m_pimpl.m_v_graphics_queue,
@@ -664,7 +664,7 @@ bool build_vulkan_renderer__retrieve_queues(vkb::Device& vkb_device,
 
 bool build_vulkan_renderer__cmd_structures(uint32_t graphics_queue_family_idx,
                                            VkDevice device,
-                                           FrameData out_frames[])
+                                           Frame_data out_frames[])
 {
     VkResult err;
 
@@ -704,7 +704,7 @@ bool build_vulkan_renderer__cmd_structures(uint32_t graphics_queue_family_idx,
     return true;
 }
 
-bool build_vulkan_renderer__sync_structures(VkDevice device, FrameData out_frames[])
+bool build_vulkan_renderer__sync_structures(VkDevice device, Frame_data out_frames[])
 {
     VkResult err;
 
@@ -1012,7 +1012,7 @@ bool teardown_vulkan_renderer__hdr_image(VmaAllocator allocator,
     return true;
 }
 
-bool teardown_vulkan_renderer__cmd_structures(VkDevice device, FrameData frames[])
+bool teardown_vulkan_renderer__cmd_structures(VkDevice device, Frame_data frames[])
 {
     for (uint32_t i = 0; i < k_frame_overlap; i++)
     {
@@ -1021,7 +1021,7 @@ bool teardown_vulkan_renderer__cmd_structures(VkDevice device, FrameData frames[
     return true;
 }
 
-bool teardown_vulkan_renderer__sync_structures(VkDevice device, FrameData frames[])
+bool teardown_vulkan_renderer__sync_structures(VkDevice device, Frame_data frames[])
 {
     for (uint32_t i = 0; i < k_frame_overlap; i++)
     {
@@ -1173,19 +1173,25 @@ bool Monolithic_renderer::Impl::update_window()
 bool Monolithic_renderer::Impl::update_and_upload_render_data()
 {
     // Update.
-    geo_instance::rebuild_bucketed_instance_list_array();
+    std::vector<vk_buffer::GPU_geo_per_frame_buffer*> all_per_frame_buffers;
+    all_per_frame_buffers.reserve(k_frame_overlap);
+    for (size_t i = 0; i < k_frame_overlap; i++)
+        all_per_frame_buffers.emplace_back(&m_frames[i].geo_per_frame_buffer);
+    geo_instance::rebuild_bucketed_instance_list_array(all_per_frame_buffers);
 
     // Upload.
-    // @TODO: implement.
-    // @TODO: START HERE!!!! make the `create_per_frame_data_buffer()` function that runs once. Then, clear and set up data to insert into it here. (or maybe recreate the buffer whne the number of instances changes. Or maybe set a hard limit on the number of instances allowed.)
-    assert(false);
+    vk_buffer::upload_changed_per_frame_data(m_immediate_submit_support,
+                                             m_v_device,
+                                             m_v_graphics_queue,
+                                             m_v_vma_allocator,
+                                             get_current_frame().geo_per_frame_buffer);
 
     return true;
 }
 
 void render__wait_until_current_frame_is_ready_to_render(VkDevice device,
                                                          VkSwapchainKHR swapchain,
-                                                         const FrameData& current_frame,
+                                                         const Frame_data& current_frame,
                                                          uint32_t& out_swapchain_image_idx)
 {
     VkResult err;
@@ -1402,7 +1408,7 @@ void render__end_command_buffer(VkCommandBuffer cmd)
 
 void render__submit_commands_to_queue(VkCommandBuffer cmd,
                                       VkQueue graphics_queue,
-                                      FrameData& current_frame)
+                                      Frame_data& current_frame)
 {
     // Prep submission to the queue.
     VkCommandBufferSubmitInfo cmd_info{ vk_util::command_buffer_submit_info(cmd) };
@@ -1430,7 +1436,7 @@ void render__submit_commands_to_queue(VkCommandBuffer cmd,
 void render__present_image(VkSwapchainKHR swapchain,
                            VkQueue graphics_queue,
                            const uint32_t& swapchain_image_idx,
-                           const FrameData& current_frame,
+                           const Frame_data& current_frame,
                            std::atomic_bool& out_is_swapchain_out_of_date)
 {
     // Present image.

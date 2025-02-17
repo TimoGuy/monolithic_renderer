@@ -22,13 +22,14 @@
 namespace vk_util { struct Immediate_submit_support; }
 
 
-struct FrameData
+struct Frame_data
 {
     VkCommandPool command_pool;
     VkCommandBuffer main_command_buffer;
     VkSemaphore swapchain_semaphore;
     VkSemaphore render_semaphore;
     VkFence render_fence;
+    vk_buffer::GPU_geo_per_frame_buffer geo_per_frame_buffer;
 };
 
 constexpr uint32_t k_frame_overlap{ 2 };
@@ -245,7 +246,7 @@ private:
         VkExtent2D                extent;
     } m_v_HDR_draw_image;
 
-    vk_buffer::GPU_geo_resource_buffer m_v_geo_resource_buffer;
+    vk_buffer::GPU_geo_resource_buffer m_v_geo_passes_resource_buffer;
 
     struct Sample_pass
     {
@@ -262,10 +263,10 @@ private:
         VkPipelineLayout pipeline_layout;
     } m_v_sample_graphics_pass;
 
-    FrameData m_frames[k_frame_overlap];
+    Frame_data m_frames[k_frame_overlap];
     std::atomic_size_t m_frame_number{ 0 };
     
-    inline FrameData& get_current_frame()
+    inline Frame_data& get_current_frame()
     {
         return m_frames[m_frame_number % k_frame_overlap];
     }

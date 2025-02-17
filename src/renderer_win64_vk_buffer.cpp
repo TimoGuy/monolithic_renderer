@@ -1,9 +1,19 @@
 #include "renderer_win64_vk_buffer.h"
 
+#include <algorithm>
 #include <cassert>
 #include <iostream>
 #include <vk_mem_alloc.h>
+#include "geo_instance.h"
 #include "renderer_win64_vk_immediate_submit.h"
+
+
+namespace vk_buffer
+{
+
+static std::vector<uint32_t> s_changed_indices;
+
+}  // namespace vk_buffer
 
 
 vk_buffer::Allocated_buffer vk_buffer::create_buffer(VmaAllocator allocator,
@@ -44,6 +54,43 @@ void vk_buffer::destroy_buffer(VmaAllocator allocator,
                                const Allocated_buffer& buffer)
 {
     vmaDestroyBuffer(allocator, buffer.buffer, buffer.allocation);
+}
+
+bool vk_buffer::expand_buffer(const vk_util::Immediate_submit_support& support,
+                              VkDevice device,
+                              VkQueue queue,
+                              VmaAllocator allocator,
+                              Allocated_buffer& in_out_buffer,
+                              size_t new_size,
+                              VkBufferUsageFlags usage,
+                              VmaMemoryUsage memory_usage)
+{
+    size_t old_size{ in_out_buffer.info.size };
+    if (new_size < old_size)
+    {
+        std::cerr << "ERROR: new_size is smaller than old_size for expansion." << std::endl;
+        assert(false);
+        return false;
+    }
+
+    // Create new buffer, copy contents of old to new, and delete old buffer.
+    Allocated_buffer new_buffer{
+        create_buffer(allocator, new_size, usage, memory_usage) };
+    
+    vk_util::immediate_submit(support, device, queue, [&](VkCommandBuffer cmd) {
+        VkBufferCopy old_to_new_copy{
+            .srcOffset = 0,
+            .dstOffset = 0,
+            .size = old_size,
+        };
+        vkCmdCopyBuffer(cmd, in_out_buffer.buffer, new_buffer.buffer, 1, &old_to_new_copy);
+    });
+
+    destroy_buffer(allocator, in_out_buffer);
+
+    in_out_buffer = new_buffer;
+
+    return true;
 }
 
 vk_buffer::GPU_mesh_buffer vk_buffer::upload_mesh_to_gpu(const vk_util::Immediate_submit_support& support,
@@ -244,4 +291,168 @@ bool vk_buffer::upload_bounding_spheres_to_gpu(
     destroy_buffer(allocator, staging_buffer);
 
     return true;
+}
+
+void vk_buffer::initialize_base_sized_per_frame_buffer(VmaAllocator allocator, GPU_geo_per_frame_buffer& frame_buffer)
+{
+    size_t capacity{ frame_buffer.expand_elems_interval };
+
+    frame_buffer.instance_data_buffer =
+        create_buffer(allocator,
+                      sizeof(gpu_geo_data::GPU_geo_instance_data) * capacity,
+                      VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                      VMA_MEMORY_USAGE_CPU_TO_GPU);
+    frame_buffer.num_instance_data_elems = 0;
+    frame_buffer.num_instance_data_elem_capacity = capacity;
+
+    frame_buffer.indirect_command_buffer =
+        create_buffer(allocator,
+                      sizeof(VkDrawIndexedIndirectCommand) * capacity,
+                      VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                      VMA_MEMORY_USAGE_CPU_TO_GPU);
+    frame_buffer.culled_indirect_command_buffer =
+        create_buffer(allocator,
+                      sizeof(VkDrawIndexedIndirectCommand) * capacity,
+                      VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+                          VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
+                      VMA_MEMORY_USAGE_GPU_ONLY);
+    frame_buffer.num_indirect_cmd_elems = 0;
+    frame_buffer.num_indirect_cmd_elem_capacity = capacity;
+}
+
+bool vk_buffer::set_new_changed_indices(std::vector<uint32_t>&& changed_indices,
+                                        std::vector<GPU_geo_per_frame_buffer*>& all_per_frame_buffers)
+{
+    // Ignore empty changed indices lists.
+    if (changed_indices.empty())
+    {
+        std::cerr << "WARNING: Empty `changed_indices` list passed in. Ignoring." << std::endl; 
+        return true;
+    }
+
+    // Check that all previous changes have propagated.
+    for (auto& frame_buffer : all_per_frame_buffers)
+    {
+        if (!frame_buffer->changed_indices_used)
+        {
+            // Previous changed indices submission has not finished propagation.
+            std::cerr << "WARNING: Previously submitted changed indices have not finished propagation." << std::endl;
+            return false;
+        }
+    }
+
+    // Replace changed indices.
+    s_changed_indices = std::move(changed_indices);
+    std::sort(s_changed_indices.begin(), s_changed_indices.end());
+    for (auto& frame_buffer : all_per_frame_buffers)
+    {
+        frame_buffer->changed_indices_used = false;
+    }
+
+    return true;
+}
+
+void vk_buffer::upload_changed_per_frame_data(const vk_util::Immediate_submit_support& support,
+                                              VkDevice device,
+                                              VkQueue queue,
+                                              VmaAllocator allocator,
+                                              GPU_geo_per_frame_buffer& frame_buffer)
+{
+    // Exit if no changes.
+    if (frame_buffer.changed_indices_used)
+        return;
+
+    // Update instance data buffer sizing.
+    size_t highest_size{ s_changed_indices.back() + 1 };
+    if (highest_size > frame_buffer.num_instance_data_elem_capacity)
+    {
+        size_t new_capacity{
+            highest_size + (highest_size % frame_buffer.expand_elems_interval) };
+        expand_buffer(support,
+                      device,
+                      queue,
+                      allocator,
+                      frame_buffer.instance_data_buffer,
+                      sizeof(gpu_geo_data::GPU_geo_instance_data) * new_capacity,
+                      VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                      VMA_MEMORY_USAGE_CPU_TO_GPU);
+        frame_buffer.num_instance_data_elem_capacity = new_capacity;
+    }
+
+    // Upload instance data.
+    auto all_instances{ geo_instance::get_all_instances() };
+    {
+        gpu_geo_data::GPU_geo_instance_data* data;
+        vmaMapMemory(allocator,
+                     frame_buffer.instance_data_buffer.allocation,
+                     reinterpret_cast<void**>(&data));
+        for (auto change_idx : s_changed_indices)
+        {
+            memcpy(data,
+                   &all_instances[change_idx]->gpu_instance_data,
+                   sizeof(gpu_geo_data::GPU_geo_instance_data));
+        }
+        vmaUnmapMemory(allocator,
+                       frame_buffer.instance_data_buffer.allocation);
+    }
+
+    // Update indirect cmd buffer sizing.
+    std::vector<const gltf_loader::Primitive*> flattened_primitives;
+    for (auto inst : all_instances)
+    {
+        auto& primitives{
+            gltf_loader::get_model(inst->model_idx).primitives };
+        for (auto& primitive : primitives)
+            flattened_primitives.emplace_back(&primitive);
+    }
+    size_t total_primitives{ flattened_primitives.size() };
+
+    if (total_primitives > frame_buffer.num_indirect_cmd_elem_capacity)
+    {
+        size_t new_capacity{
+            total_primitives + (highest_size % frame_buffer.expand_elems_interval)
+        };
+        expand_buffer(support,
+                      device,
+                      queue,
+                      allocator,
+                      frame_buffer.indirect_command_buffer,
+                      sizeof(VkDrawIndexedIndirectCommand) * new_capacity,
+                      VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                      VMA_MEMORY_USAGE_CPU_TO_GPU);
+
+        // Simply destroy and recreate buffer since no copying needed.
+        destroy_buffer(allocator, frame_buffer.culled_indirect_command_buffer);
+        frame_buffer.culled_indirect_command_buffer =
+            create_buffer(allocator,
+                          sizeof(VkDrawIndexedIndirectCommand) * new_capacity,
+                          VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+                              VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
+                          VMA_MEMORY_USAGE_GPU_ONLY);
+
+        frame_buffer.num_indirect_cmd_elem_capacity = total_primitives;
+    }
+
+    // Upload new indirect commands.
+    // @TODO: Maybe there could be a more optimal way of doing this but as
+    //        long as it's not gonna be too slow, we're just gonna rewrite
+    //        the whole buffer.
+    std::vector<VkDrawIndexedIndirectCommand> new_indirect_cmds;
+    new_indirect_cmds.reserve(total_primitives);
+
+    // @TODO: @CHECK: @NOCHECKIN: figure out how to get this to produce....
+
+    {
+        void* data;
+        vmaMapMemory(allocator,
+                     frame_buffer.indirect_command_buffer.allocation,
+                     &data);
+        memcpy(data,
+               new_indirect_cmds.data(),
+               sizeof(VkDrawIndexedIndirectCommand) * new_indirect_cmds.size());
+        vmaUnmapMemory(allocator,
+                       frame_buffer.indirect_command_buffer.allocation);
+    }
+
+    frame_buffer.changed_indices_used = true;
 }
