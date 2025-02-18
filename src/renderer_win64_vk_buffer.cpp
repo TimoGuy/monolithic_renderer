@@ -369,8 +369,8 @@ void vk_buffer::upload_changed_per_frame_data(const vk_util::Immediate_submit_su
 
     // Assign ids to all instances.
     uint32_t count{ s_current_register_idx };  // @TODO: START HERE!!!!! Add some kind of span to iterate thru the unique, flat array of registered instances.
-    for (uint32_t i = 0; i < count; i++)
-    {
+    for (uint32_t i = 0; i < count; i++)       //   OKAY, so upload the instances into the instance buffer while assigning instance ids to them for creating indirect instanceid draw calls.
+    {                                          //     And then when going thru the bucketed stuff to populate the indirect cmd buffer, go into the instance data and read the assigned instance id to write to the indirect instanceid.
         auto& instance{ s_all_instances[i] };
 
     }
