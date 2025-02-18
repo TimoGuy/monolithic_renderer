@@ -11,7 +11,8 @@
 namespace vk_buffer
 {
 
-static std::vector<uint32_t> s_changed_indices;
+// @TODO: delete this! @THEA: I feel like for now I'm not gonna bother with changed indices until the instance pool data structure is more set in stone.
+// static std::vector<uint32_t> s_changed_indices;
 
 }  // namespace vk_buffer
 
@@ -362,6 +363,21 @@ void vk_buffer::upload_changed_per_frame_data(const vk_util::Immediate_submit_su
     if (frame_buffer.changed_indices_used)
         return;
 
+    // @TODO: Maybe there could be a more optimal way of doing this but as
+    //        long as it's not gonna be too slow, we're just gonna rewrite
+    //        the whole buffer for both instance and indirect buffers.
+
+    // Assign ids to all instances.
+    uint32_t count{ s_current_register_idx };  // @TODO: START HERE!!!!! Add some kind of span to iterate thru the unique, flat array of registered instances.
+    for (uint32_t i = 0; i < count; i++)
+    {
+        auto& instance{ s_all_instances[i] };
+
+    }
+
+    // Sort all instance primitives.
+    auto all_instances{ geo_instance::get_all_instance_primitives() };
+
     // Update instance data buffer sizing.
     size_t highest_size{ s_changed_indices.back() + 1 };
     if (highest_size > frame_buffer.num_instance_data_elem_capacity)
@@ -377,23 +393,6 @@ void vk_buffer::upload_changed_per_frame_data(const vk_util::Immediate_submit_su
                       VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                       VMA_MEMORY_USAGE_CPU_TO_GPU);
         frame_buffer.num_instance_data_elem_capacity = new_capacity;
-    }
-
-    // Upload instance data.
-    auto all_instances{ geo_instance::get_all_instances() };
-    {
-        gpu_geo_data::GPU_geo_instance_data* data;
-        vmaMapMemory(allocator,
-                     frame_buffer.instance_data_buffer.allocation,
-                     reinterpret_cast<void**>(&data));
-        for (auto change_idx : s_changed_indices)
-        {
-            memcpy(data,
-                   &all_instances[change_idx]->gpu_instance_data,
-                   sizeof(gpu_geo_data::GPU_geo_instance_data));
-        }
-        vmaUnmapMemory(allocator,
-                       frame_buffer.instance_data_buffer.allocation);
     }
 
     // Update indirect cmd buffer sizing.
@@ -433,10 +432,22 @@ void vk_buffer::upload_changed_per_frame_data(const vk_util::Immediate_submit_su
         frame_buffer.num_indirect_cmd_elem_capacity = total_primitives;
     }
 
-    // Upload new indirect commands.
-    // @TODO: Maybe there could be a more optimal way of doing this but as
-    //        long as it's not gonna be too slow, we're just gonna rewrite
-    //        the whole buffer.
+    // Upload new instance data and indirect commands.
+
+    // Upload instance data.
+    gpu_geo_data::GPU_geo_instance_data* data;
+    vmaMapMemory(allocator,
+                 frame_buffer.instance_data_buffer.allocation,
+                 reinterpret_cast<void**>(&data));
+    for (auto change_idx : s_changed_indices)
+    {
+        memcpy(data,
+               &all_instances[change_idx]->gpu_instance_data,
+               sizeof(gpu_geo_data::GPU_geo_instance_data));
+    }
+    vmaUnmapMemory(allocator,
+                   frame_buffer.instance_data_buffer.allocation);
+
     std::vector<VkDrawIndexedIndirectCommand> new_indirect_cmds;
     new_indirect_cmds.reserve(total_primitives);
 

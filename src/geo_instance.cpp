@@ -20,14 +20,9 @@ namespace geo_instance
 {
 
 // Access the bucket by: Geo render pass and then Pipeline idx.
-struct Instance_primitive
-{
-    const Geo_instance* instance;
-    const gltf_loader::Primitive* primitive;
-};
-
+using Pipeline_id_t = uint32_t;
 using Primitive_list_t = std::vector<Instance_primitive>;
-using Pipeline_primitive_list_map_t = std::unordered_map<uint32_t, Primitive_list_t>;
+using Pipeline_primitive_list_map_t = std::unordered_map<Pipeline_id_t, Primitive_list_t>;
 constexpr size_t k_num_render_passes{ static_cast<uint8_t>(Geo_render_pass::NUM_GEO_RENDER_PASSES) };
 using Geo_render_pass_bucketed_primitive_list_array_t =
     std::array<Pipeline_primitive_list_map_t, k_num_render_passes>;
@@ -84,6 +79,7 @@ void geo_instance::rebuild_bucketed_instance_list_array(std::vector<vk_buffer::G
     TIMING_REPORT_START(rebucket);
 
     // Insert built up changed instance indices.
+    // @TODO: remove this.
     vk_buffer::set_new_changed_indices(std::move(s_changed_inst_indices),
                                        all_per_frame_buffers);
     s_changed_inst_indices = std::vector<uint32_t>();
@@ -129,30 +125,22 @@ void geo_instance::rebuild_bucketed_instance_list_array(std::vector<vk_buffer::G
     s_flag_rebucketing = false;
 }
 
-std::vector<const geo_instance::Geo_instance*> geo_instance::get_all_instances()
+std::vector<geo_instance::Instance_primitive*> geo_instance::get_all_instance_primitives()
 {
-    std::vector<const geo_instance::Geo_instance*> instances;
+    std::vector<Instance_primitive*> inst_prims;
 
     if (!s_flag_rebucketing)
     {
         // @INCOMPLETE: asdfasdfasdfasdfasdf
-        uint32_t count{ s_current_register_idx };
-        instances.reserve(count);
         for (auto& render_pass : s_bucketed_instance_primitives_list)
         for (auto it = render_pass.begin(); it != render_pass.end(); it++)
         for (auto& instance_primitive : it->second)
         {
-            // @FIXME: @NOCHECKIN: @TODO: @CHECK: It seems like this will duplicate instances, since it's grouped with primitives.
-            // @THINK: Take a step back and think!!!!!! I think this is on the right track but wrong in places.
-            instances.emplace_back(instance_primitive.instance);
+            inst_prims.emplace_back(&instance_primitive);
         }
-
-        // for (uint32_t i = 0; i < count; i++)
-        // {
-        //     instances.emplace_back(&s_all_instances[i]);
-        // }
+        inst_prims.shrink_to_fit();
         ////////////////////////////////////
     }
 
-    return instances;
+    return inst_prims;
 }

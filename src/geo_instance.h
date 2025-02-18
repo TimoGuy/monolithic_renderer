@@ -28,6 +28,12 @@ struct Geo_instance
     gpu_geo_data::GPU_geo_instance_data gpu_instance_data;
 };
 
+struct Instance_primitive
+{
+    const Geo_instance* instance;
+    const gltf_loader::Primitive* primitive;
+};
+
 using Geo_instance_key_t = uint32_t;
 
 Geo_instance_key_t register_geo_instance(Geo_instance&& new_instance);
@@ -36,6 +42,6 @@ void unregister_geo_instance(Geo_instance_key_t key);
 
 void rebuild_bucketed_instance_list_array(std::vector<vk_buffer::GPU_geo_per_frame_buffer*>& all_per_frame_buffers);
 
-std::vector<const geo_instance::Geo_instance*> get_all_instances();
+std::vector<Instance_primitive*> get_all_instance_primitives();
 
 }  // namespace geo_instance
