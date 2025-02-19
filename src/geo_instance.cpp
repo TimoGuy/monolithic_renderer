@@ -111,7 +111,7 @@ void geo_instance::rebuild_bucketed_instance_list_array(std::vector<vk_buffer::G
             s_bucketed_instance_primitives_list
                 [static_cast<uint8_t>(instance.render_pass)]
                 [pipeline_idx]
-                    .emplace_back(&instance, &primitive);
+                    .emplace_back(&primitive, &instance);
         }
     }
     ////////////////////////////////////
@@ -125,13 +125,32 @@ void geo_instance::rebuild_bucketed_instance_list_array(std::vector<vk_buffer::G
     s_flag_rebucketing = false;
 }
 
-std::vector<geo_instance::Instance_primitive*> geo_instance::get_all_instance_primitives()
+std::vector<geo_instance::Geo_instance*> geo_instance::get_all_unique_instances()
+{
+    std::vector<Geo_instance*> instances;
+
+    // @INCOMPLETE: THIS ISN't THE FINAL IMPLEMENTATION AFAIK //
+    Geo_instance_key_t inst_count{ s_current_register_idx };
+    assert(inst_count <= k_num_instances);
+
+    instances.reserve(inst_count);
+    for (Geo_instance_key_t k = 0; k < inst_count; k++)
+    {
+        instances.emplace_back(&s_all_instances[k]);
+    }
+    ////////////////////////////////////////////////////////////
+
+    return instances;
+}
+
+std::vector<geo_instance::Instance_primitive*> geo_instance::get_all_primitives()
 {
     std::vector<Instance_primitive*> inst_prims;
 
     if (!s_flag_rebucketing)
     {
         // @INCOMPLETE: asdfasdfasdfasdfasdf
+        // @NOTE: this may be the exact way this is addressed since this is the bucket notation stuff.
         for (auto& render_pass : s_bucketed_instance_primitives_list)
         for (auto it = render_pass.begin(); it != render_pass.end(); it++)
         for (auto& instance_primitive : it->second)

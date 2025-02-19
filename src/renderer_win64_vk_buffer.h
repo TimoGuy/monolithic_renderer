@@ -88,7 +88,7 @@ struct GPU_geo_per_frame_buffer
     std::atomic_size_t num_indirect_cmd_elems{ 0 };
     std::atomic_size_t num_indirect_cmd_elem_capacity{ 0 };
     const size_t expand_elems_interval{ 1024 };
-    std::atomic_bool changed_indices_used{ true };
+    std::atomic_bool changes_processed{ true };
 };
 
 void initialize_base_sized_per_frame_buffer(VmaAllocator allocator,

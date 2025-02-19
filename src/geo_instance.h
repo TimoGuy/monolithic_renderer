@@ -25,13 +25,18 @@ struct Geo_instance
     // @NOTE: WATER_TRANSPARENT is never a shadow caster.
     bool is_shadow_caster{ true };
 
+    // Position in instance buffer where this instance
+    // is uploaded on the GPU.
+    uint32_t cooked_buffer_instance_id;
+
     gpu_geo_data::GPU_geo_instance_data gpu_instance_data;
 };
 
-struct Instance_primitive
+// Primitive w/ corresponding ptr to instance.
+struct Instance_primitive  // @TODO: rename to Primitive_wc_instance
 {
-    const Geo_instance* instance;
     const gltf_loader::Primitive* primitive;
+    const Geo_instance* instance;
 };
 
 using Geo_instance_key_t = uint32_t;
@@ -42,6 +47,8 @@ void unregister_geo_instance(Geo_instance_key_t key);
 
 void rebuild_bucketed_instance_list_array(std::vector<vk_buffer::GPU_geo_per_frame_buffer*>& all_per_frame_buffers);
 
-std::vector<Instance_primitive*> get_all_instance_primitives();
+std::vector<Geo_instance*> get_all_unique_instances();
+
+std::vector<Instance_primitive*> get_all_primitives();
 
 }  // namespace geo_instance
