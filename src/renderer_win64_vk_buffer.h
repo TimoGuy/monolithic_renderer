@@ -94,10 +94,12 @@ struct GPU_geo_per_frame_buffer
 void initialize_base_sized_per_frame_buffer(VmaAllocator allocator,
                                             GPU_geo_per_frame_buffer& frame_buffer);
 
-// @NOTE: Returns false if the previous requested change did not finish
-//        propagating to all the frames. False means "try again later".
-bool set_new_changed_indices(std::vector<uint32_t>&& changed_indices,
-                             std::vector<GPU_geo_per_frame_buffer*>& all_per_frame_buffers);
+// // @NOTE: Returns false if the previous requested change did not finish
+// //        propagating to all the frames. False means "try again later".
+// bool set_new_changed_indices(std::vector<uint32_t>&& changed_indices,
+//                              std::vector<GPU_geo_per_frame_buffer*>& all_per_frame_buffers);
+
+void flag_update_all_instances(std::vector<GPU_geo_per_frame_buffer*>& all_per_frame_buffers);
 
 void upload_changed_per_frame_data(const vk_util::Immediate_submit_support& support,
                                    VkDevice device,

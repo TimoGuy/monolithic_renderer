@@ -79,10 +79,15 @@ void geo_instance::rebuild_bucketed_instance_list_array(std::vector<vk_buffer::G
     TIMING_REPORT_START(rebucket);
 
     // Insert built up changed instance indices.
-    // @TODO: remove this.
-    vk_buffer::set_new_changed_indices(std::move(s_changed_inst_indices),
-                                       all_per_frame_buffers);
-    s_changed_inst_indices = std::vector<uint32_t>();
+    // @TODO: perhaps include something like this in the future but for now just mark a rebuild.
+    // vk_buffer::set_new_changed_indices(std::move(s_changed_inst_indices),
+    //                                    all_per_frame_buffers);
+    // s_changed_inst_indices = std::vector<uint32_t>();
+    //
+    // @TODO: improve performance with updating everything only when
+    // the instance pool updates but only update the data in the position
+    // of the instance if it's just the only thing(s) that have updated.  -Thea 2025/02/19
+    vk_buffer::flag_update_all_instances(all_per_frame_buffers);
 
     // Rebucket.
     for (auto& instance_list_map : s_bucketed_instance_primitives_list)  // @CHECK: does a mem leak happen here?????

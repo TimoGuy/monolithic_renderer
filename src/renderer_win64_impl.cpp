@@ -1173,18 +1173,22 @@ bool Monolithic_renderer::Impl::update_window()
 bool Monolithic_renderer::Impl::update_and_upload_render_data()
 {
     // Update.
+    TIMING_REPORT_START(rebucket);
     std::vector<vk_buffer::GPU_geo_per_frame_buffer*> all_per_frame_buffers;
     all_per_frame_buffers.reserve(k_frame_overlap);
     for (size_t i = 0; i < k_frame_overlap; i++)
         all_per_frame_buffers.emplace_back(&m_frames[i].geo_per_frame_buffer);
     geo_instance::rebuild_bucketed_instance_list_array(all_per_frame_buffers);
+    TIMING_REPORT_END_AND_PRINT(rebucket, "Rebucket Instance Data: ");
 
     // Upload.
+    TIMING_REPORT_START(upload_per_frame);
     vk_buffer::upload_changed_per_frame_data(m_immediate_submit_support,
                                              m_v_device,
                                              m_v_graphics_queue,
                                              m_v_vma_allocator,
                                              get_current_frame().geo_per_frame_buffer);
+    TIMING_REPORT_END_AND_PRINT(upload_per_frame, "Upload Changed Per-frame Data: ");
 
     return true;
 }

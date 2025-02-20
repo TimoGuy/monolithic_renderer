@@ -320,39 +320,50 @@ void vk_buffer::initialize_base_sized_per_frame_buffer(VmaAllocator allocator, G
     frame_buffer.num_indirect_cmd_elem_capacity = capacity;
 }
 
-bool vk_buffer::set_new_changed_indices(std::vector<uint32_t>&& changed_indices,
-                                        std::vector<GPU_geo_per_frame_buffer*>& all_per_frame_buffers)
+// bool vk_buffer::set_new_changed_indices(std::vector<uint32_t>&& changed_indices,
+//                                         std::vector<GPU_geo_per_frame_buffer*>& all_per_frame_buffers)
+// {
+//     // @TODO: START HERE!!!!!! Think about what you want to do as far as the changed indices function.
+//     //        It would honestly be nice to only update the indices that have changed within the buffer.
+//     //        Idk... think about it!!!!
+
+//     // Ignore empty changed indices lists.
+//     if (changed_indices.empty())
+//     {
+//         std::cerr << "WARNING: Empty `changed_indices` list passed in. Ignoring." << std::endl; 
+//         return true;
+//     }
+
+//     // Check that all previous changes have propagated.
+//     for (auto& frame_buffer : all_per_frame_buffers)
+//     {
+//         if (!frame_buffer->changes_processed)
+//         {
+//             std::cerr << "WARNING: Previously submitted changes have not finished propagation." << std::endl;
+//             return false;
+//         }
+//     }
+
+//     // Replace changed indices.
+//     s_changed_indices = std::move(changed_indices);
+//     std::sort(s_changed_indices.begin(), s_changed_indices.end());
+//     for (auto& frame_buffer : all_per_frame_buffers)
+//     {
+//         frame_buffer->changes_processed = false;
+//     }
+
+//     return true;
+// }
+
+void vk_buffer::flag_update_all_instances(std::vector<GPU_geo_per_frame_buffer*>& all_per_frame_buffers)
 {
-    // @TODO: START HERE!!!!!! Think about what you want to do as far as the changed indices function.
-    //        It would honestly be nice to only update the indices that have changed within the buffer.
-    //        Idk... think about it!!!!
-
-    // Ignore empty changed indices lists.
-    if (changed_indices.empty())
-    {
-        std::cerr << "WARNING: Empty `changed_indices` list passed in. Ignoring." << std::endl; 
-        return true;
-    }
-
-    // Check that all previous changes have propagated.
-    for (auto& frame_buffer : all_per_frame_buffers)
-    {
-        if (!frame_buffer->changes_processed)
-        {
-            std::cerr << "WARNING: Previously submitted changes have not finished propagation." << std::endl;
-            return false;
-        }
-    }
-
-    // Replace changed indices.
-    s_changed_indices = std::move(changed_indices);
-    std::sort(s_changed_indices.begin(), s_changed_indices.end());
-    for (auto& frame_buffer : all_per_frame_buffers)
+    // @TODO: @INCOMPLETE: This should be more efficientttttttt //
+    // @NOTE: essentially just marks all frame buffers as needing to rebuild all instances.
+    for (auto frame_buffer : all_per_frame_buffers)
     {
         frame_buffer->changes_processed = false;
     }
-
-    return true;
+    //////////////////////////////////////////////////////////////
 }
 
 void vk_buffer::upload_changed_per_frame_data(const vk_util::Immediate_submit_support& support,
