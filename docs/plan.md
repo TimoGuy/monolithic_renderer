@@ -17,6 +17,7 @@ Since this is the monolithic renderer, a rendering pipeline designed for the 3D 
 - Irradiance and Reflectance maps
 - Shadows
 - "Outdoor influence" occlusion system
+    - Perhaps... use amd brixelizer gi? It is screen space GI but that could be good. It would probably dictate that the application be deferred rendering tho.
 - Volumetric rendering
     - Clouuuuuuuds!!!!
     - God rays!!!
