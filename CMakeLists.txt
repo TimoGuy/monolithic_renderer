@@ -111,58 +111,60 @@ target_link_libraries(${PROJECT_NAME}
 )
 
 # Compile shaders.
+set(SHADER_SRC_DIR
+    ${CMAKE_CURRENT_SOURCE_DIR}/shader_src)
+
+set(shader_includes
+    ${SHADER_SRC_DIR}/geommat_static_mesh_vert.glsl
+)
+
 set(all_shaders
-    ${CMAKE_CURRENT_SOURCE_DIR}/shader_src/colored_triangle.frag
-    ${CMAKE_CURRENT_SOURCE_DIR}/shader_src/colored_triangle.vert
-    ${CMAKE_CURRENT_SOURCE_DIR}/shader_src/geommat_missing.frag
-    ${CMAKE_CURRENT_SOURCE_DIR}/shader_src/geommat_missing.vert
-    ${CMAKE_CURRENT_SOURCE_DIR}/shader_src/gradient.comp
+    ${SHADER_SRC_DIR}/colored_triangle.frag
+    ${SHADER_SRC_DIR}/colored_triangle.vert
+    ${SHADER_SRC_DIR}/geommat_missing.frag
+    ${SHADER_SRC_DIR}/geommat_missing.vert
+    ${SHADER_SRC_DIR}/gradient.comp
 )
 
 if(WIN32)
     # Use glslc.
-    function(add_shaders)
-        set(SHADER_SOURCE_FILES ${ARGN})
-        list(LENGTH SHADER_SOURCE_FILES FILE_COUNT)
-        if(FILE_COUNT EQUAL 0)
-            message(FATAL_ERROR "Cannot create a shaders target without any source files.")
-        endif()
+    list(LENGTH all_shaders FILE_COUNT)
+    if(FILE_COUNT EQUAL 0)
+        message(FATAL_ERROR "Cannot create a shaders target without any source files.")
+    endif()
 
-        # set(OUTDATED_SHADERS_FOUND FALSE)
-        set(ALL_SHADER_PRODUCTS)
+    # set(OUTDATED_SHADERS_FOUND FALSE)
+    set(ALL_SHADER_PRODUCTS)
         
-        foreach(SHADER_SOURCE IN LISTS SHADER_SOURCE_FILES)
-            cmake_path(ABSOLUTE_PATH SHADER_SOURCE NORMALIZE)
-            cmake_path(GET SHADER_SOURCE FILENAME SHADER_NAME)
+    foreach(SHADER_SOURCE IN LISTS all_shaders)
+        cmake_path(ABSOLUTE_PATH SHADER_SOURCE NORMALIZE)
+        cmake_path(GET SHADER_SOURCE FILENAME SHADER_NAME)
 
-            set(SHADER_PRODUCT "${ASSET_DIR}/shaders/${SHADER_NAME}.spv")
-            list(APPEND ALL_SHADER_PRODUCTS "${SHADER_PRODUCT}")
-            message("Found shader: \"" ${SHADER_NAME} "\"")
+        set(SHADER_PRODUCT "${ASSET_DIR}/shaders/${SHADER_NAME}.spv")
+        list(APPEND ALL_SHADER_PRODUCTS "${SHADER_PRODUCT}")
+        message("Found shader: \"" ${SHADER_NAME} "\"")
 
-            # Build command.
-            set(SHADER_COMMAND)
-            list(APPEND SHADER_COMMAND Vulkan::glslc)
-            list(APPEND SHADER_COMMAND "${SHADER_SOURCE}")
-            list(APPEND SHADER_COMMAND "--target-env=vulkan1.3")
-            list(APPEND SHADER_COMMAND "-Werror")  # Treat warnings as errors.
-            list(APPEND SHADER_COMMAND "-O")       # Optimize for performance.
-            list(APPEND SHADER_COMMAND "-o")
-            list(APPEND SHADER_COMMAND "${SHADER_PRODUCT}")
+        # Build command.
+        set(SHADER_COMMAND)
+        list(APPEND SHADER_COMMAND Vulkan::glslc)
+        list(APPEND SHADER_COMMAND "${SHADER_SOURCE}")
+        list(APPEND SHADER_COMMAND "--target-env=vulkan1.3")
+        list(APPEND SHADER_COMMAND "-Werror")  # Treat warnings as errors.
+        list(APPEND SHADER_COMMAND "-O")       # Optimize for performance.
+        list(APPEND SHADER_COMMAND "-o")
+        list(APPEND SHADER_COMMAND "${SHADER_PRODUCT}")
 
-            add_custom_command(
-                OUTPUT ${SHADER_PRODUCT}
-                COMMAND ${SHADER_COMMAND}
-                COMMENT "Compiling shader: \"${SHADER_NAME}\""
-                DEPENDS ${SHADER_SOURCE}
-            )
-        endforeach()
-
-        add_custom_target(${PROJECT_NAME}_shaders ALL
-            DEPENDS ${ALL_SHADER_PRODUCTS}
+        add_custom_command(
+            OUTPUT ${SHADER_PRODUCT}
+            COMMAND ${SHADER_COMMAND}
+            COMMENT "Compiling shader: \"${SHADER_NAME}\""
+            DEPENDS ${SHADER_SOURCE} ${shader_includes}
         )
-    endfunction()
+    endforeach()
+
+    add_custom_target(${PROJECT_NAME}_shaders ALL
+        DEPENDS ${ALL_SHADER_PRODUCTS}
+    )
 else()
     message(FATAL_ERROR "Unsupported Shader Compiler.")
 endif()
-
-add_shaders(${all_shaders})

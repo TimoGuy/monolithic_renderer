@@ -102,7 +102,6 @@ vec3 calc_normal()
         normalize(
             transpose(inverse(
                 mat3(geo_instance_buffer.instances[gl_BaseInstance].transform)
-            )) *
-                in_normal
+            )) * in_normal
         );
 }
