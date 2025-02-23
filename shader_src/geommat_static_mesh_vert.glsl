@@ -8,6 +8,7 @@ layout (location = 4) in uint in_primitive_idx;
 // Matches `GPU_camera`.
 layout(set = 0, binding = 0) uniform Camera_buffer
 {
+    mat4 view;
 	mat4 projection_view;
 } camera;
 
@@ -75,4 +76,33 @@ uint get_material_param_idx()
             .material_param_buffer_start_idx +
                 in_primitive_idx;
     return material_param_buffer.params[mat_param_buffer_idx].material_param_idx;
+}
+
+vec3 calc_world_position()
+{
+    vec4 local_pos =
+        geo_instance_buffer.instances[gl_BaseInstance].transform *
+            vec4(in_position, 1.0);
+    return local_pos.xyz / local_pos.w;
+}
+
+vec4 calc_projection_view_position(vec3 world_pos)
+{
+    return camera.projection_view * vec4(world_pos, 1.0);
+}
+
+vec3 calc_view_position(vec3 world_pos)
+{
+    return (camera.view * vec4(world_pos, 1.0)).xyz;
+}
+
+vec3 calc_normal()
+{
+    return
+        normalize(
+            transpose(inverse(
+                mat3(geo_instance_buffer.instances[gl_BaseInstance].transform)
+            )) *
+                in_normal
+        );
 }
