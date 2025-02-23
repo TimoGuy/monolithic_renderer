@@ -81,6 +81,7 @@ gltf_loader::Vertex_input_description gltf_loader::GPU_vertex::get_static_vertex
     //        shader and inserted into this same vertex description.
     //        Skinned/alembic vertices are placed in a storage buffer instead
     //        (WARNING: storage buffers will have different memory padding rules)
+    // Matches `geommat_static_mesh_vert.glsl`.
     static Vertex_input_description vertex_desc{
         .bindings{
             VkVertexInputBindingDescription{

@@ -1,4 +1,6 @@
 #version 460
+#extension GL_GOOGLE_include_directive : enable
+#include "geommat_static_mesh_vert.glsl"
 
 layout (location = 0) out vec3 out_color;
 

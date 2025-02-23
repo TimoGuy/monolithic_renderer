@@ -30,6 +30,8 @@ struct GPU_material
 
 struct GPU_material_set
 {
+    // Insert first index into the buffer of where each material param set starts in buffer.
+    // Insert all `cooked_material_param_local_idx` of each material into a buffer.
     std::vector<uint32_t> material_indexes;
 };
 

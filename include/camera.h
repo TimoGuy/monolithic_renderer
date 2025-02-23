@@ -9,6 +9,12 @@
 namespace camera
 {
 
+// Matches `geommat_static_mesh_vert.glsl`.
+struct GPU_camera
+{
+    mat4 projection_view;
+};
+
 void set_aspect_ratio(uint32_t screen_width, uint32_t screen_height);
 void set_fov(float_t radians);
 void set_near_far(float_t near, float_t far);

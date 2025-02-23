@@ -29,11 +29,6 @@ struct GPU_bounding_sphere
     vec4 origin_xyz_radius_w;
 };
 
-struct GPU_material_param_set_data
-{
-    // @TODO: figure out how to do this. Also, maybe do stuff????
-};
-
 // Have compute shader compute culling with all the bounding spheres write all the draw commands.
 // First, calculate if an instance's bounding sphere is included in the draw calls.
 
