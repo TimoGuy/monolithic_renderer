@@ -172,9 +172,9 @@ int32_t Monolithic_renderer::Impl::Load_assets_job::execute()
 
     // Models.
     TIMING_REPORT_START(upload_combined_mesh);
-    gltf_loader::load_gltf("res/models/slime_girl.glb");  // @TODO: figure out way to string lookup models.
-    gltf_loader::load_gltf("res/models/enemy_wip.glb");
-    gltf_loader::load_gltf("res/models/box.gltf");
+    gltf_loader::load_gltf("assets/models/slime_girl.glb");  // @TODO: figure out way to string lookup models.
+    gltf_loader::load_gltf("assets/models/enemy_wip.glb");
+    gltf_loader::load_gltf("assets/models/box.gltf");
     gltf_loader::upload_combined_mesh(m_pimpl.m_immediate_submit_support,
                                       m_pimpl.m_v_device,
                                       m_pimpl.m_v_graphics_queue,
@@ -812,7 +812,7 @@ bool build_vulkan_renderer__pipelines(VkDevice device,
 
     // Create pipeline.
     VkShaderModule compute_draw_shader;
-    if (!vk_pipeline::load_shader_module(("res/shaders/gradient.comp.spv"),
+    if (!vk_pipeline::load_shader_module(("assets/shaders/gradient.comp.spv"),
                                          device,
                                          compute_draw_shader))
     {
@@ -850,7 +850,7 @@ bool build_vulkan_renderer__triangle_graphic_pipeline(VkDevice device,
     // @NOCHECKIN: @THEA
     // ------------------------------------------------------------------------
     VkShaderModule triangle_vert_shader;
-    if (!vk_pipeline::load_shader_module(("res/shaders/colored_triangle.vert.spv"),
+    if (!vk_pipeline::load_shader_module(("assets/shaders/colored_triangle.vert.spv"),
                                          device,
                                          triangle_vert_shader))
     {
@@ -858,7 +858,7 @@ bool build_vulkan_renderer__triangle_graphic_pipeline(VkDevice device,
         assert(false);
     }
     VkShaderModule triangle_frag_shader;
-    if (!vk_pipeline::load_shader_module(("res/shaders/colored_triangle.frag.spv"),
+    if (!vk_pipeline::load_shader_module(("assets/shaders/colored_triangle.frag.spv"),
                                          device,
                                          triangle_frag_shader))
     {
