@@ -3,8 +3,6 @@
 
 layout (local_size_x = 16, local_size_y = 16) in;
 
-layout (rgba16f, set = 0, binding = 0) uniform image2D image;
-
 // Per frame data (set = 0).
 #include "geom_per_frame_datas_set0.glsl"
 
@@ -19,26 +17,58 @@ layout(std140, set = 1, binding = 0) readonly buffer Bounding_sphere_buffer
     Bounding_sphere bounding_spheres[];
 } bounding_sphere_buffer;
 
+struct Indirect_draw_commands_data
+{
+    uint indexCount;
+    uint instanceCount;
+    uint firstIndex;
+    int  vertexOffset;
+    uint firstInstance;
+};
+
+layout(set = 2, binding = 0) readonly buffer Indirect_draw_commands_raw_buffer
+{
+	Indirect_draw_commands_data commands[];
+} draw_commands_input;
+
+layout(set = 2, binding = 1) buffer Indirect_draw_commands_output_buffer
+{
+	Indirect_draw_commands_data commands[];
+} draw_commands_output;
+
+// Params.
+layout(push_constant) uniform Params
+{
+    float z_near;
+    float z_far;
+    float frustum_x_x;
+    float frustum_x_z;
+    float frustum_y_y;
+    float frustum_y_z;
+    uint  culling_enabled;
+    uint  num_instances;
+} params;
+
+bool is_visible(uint object_id)
+{
+    // @TODO: IMPLEMENT.
+    return true;
+}
 
 void main()
 {
     // @TODO: @FIXME: @THEA
-    assert(false) // This is fake code, but it's meant to not have this compile haha.
-
-
-
-    ivec2 texel_coord = ivec2(gl_GlobalInvocationID.xy);
-    ivec2 size = imageSize(image);
-
-    if (texel_coord.x < size.x && texel_coord.y < size.y)
+    uint g_id = gl_GlobalInvocationID.x;
+    if (g_id < params.num_instances)
     {
-        vec4 color = vec4(0.0, 0.0, 0.0, 1.0);
-        if (gl_LocalInvocationID.x != 0 && gl_LocalInvocationID.y != 0)
+        if (is_visible(g_id))
         {
-            color.x = float(texel_coord.x) / size.x;
-            color.y = float(texel_coord.y) / size.y;
-        }
+            uint count_idx;
+            uint batch_offset;
 
-        imageStore(image, texel_coord, color);
+            uint copy_to = batch_offset;
+            draw_commands_output.commands[copy_to] =
+                draw_commands_input.commands[g_id];
+        }
     }
 }

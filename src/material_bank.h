@@ -35,8 +35,10 @@ struct GPU_material_set
 
 // Pipeline.
 GPU_pipeline create_geometry_material_pipeline(VkDevice device,
-                                               const char *vert_shader_path,
-                                               const char *frag_shader_path);
+                                               VkFormat draw_format,
+                                               std::vector<VkDescriptorSetLayout> descriptor_layouts,
+                                               const char* vert_shader_path,
+                                               const char* frag_shader_path);
 
 uint32_t register_pipeline(const std::string& pipe_name,
                            GPU_pipeline&& new_pipeline);

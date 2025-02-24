@@ -37,8 +37,10 @@ static std::mutex s_all_material_sets_mutex;
 // Pipeline.
 material_bank::GPU_pipeline material_bank::create_geometry_material_pipeline(
     VkDevice device,
-    const char *vert_shader_path,
-    const char *frag_shader_path)
+    VkFormat draw_format,
+    std::vector<VkDescriptorSetLayout> descriptor_layouts,
+    const char* vert_shader_path,
+    const char* frag_shader_path)
 {
     VkShaderModule vert_shader;
     if (!vk_pipeline::load_shader_module(vert_shader_path,
@@ -50,7 +52,7 @@ material_bank::GPU_pipeline material_bank::create_geometry_material_pipeline(
     }
 
     VkShaderModule frag_shader;
-    if (!vk_pipeline::load_shader_module(vert_shader_path,
+    if (!vk_pipeline::load_shader_module(frag_shader_path,
                                          device,
                                          frag_shader))
     {
@@ -58,9 +60,42 @@ material_bank::GPU_pipeline material_bank::create_geometry_material_pipeline(
         assert(false);
     }
 
-    // @TODO: @INCOMPLETE START HERE!!!! @THEA
-    // GPU_pipeline new_pipeline;
-    // vk_pipeline::Graphics_pipeline_builder{}
+    // Create pipeline layout.
+    GPU_pipeline new_pipeline;
+    VkPipelineLayoutCreateInfo layout_info{
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+        .pNext = nullptr,
+        .setLayoutCount = static_cast<uint32_t>(descriptor_layouts.size()),
+        .pSetLayouts = descriptor_layouts.data(),
+    };
+    VkResult err{
+        vkCreatePipelineLayout(device, &layout_info, nullptr, &new_pipeline.pipeline_layout) };
+    if (err)
+    {
+        std::cerr << "ERROR: Pipeline layout creation failed." << std::endl;
+        assert(false);
+    }
+
+    // Create pipeline.
+    vk_pipeline::Graphics_pipeline_builder builder;
+    builder.set_pipeline_layout(new_pipeline.pipeline_layout);
+    builder.set_shaders(vert_shader, frag_shader);
+    builder.set_vertex_input(gltf_loader::GPU_vertex::get_static_vertex_description());
+    builder.set_input_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+    builder.set_polygon_mode(VK_POLYGON_MODE_FILL);
+    builder.set_cull_mode(VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE);
+    builder.set_multisampling_none();
+    builder.disable_blending();
+    builder.disable_depthtest();
+    builder.set_color_attachment_format(draw_format);
+    builder.set_depth_format(VK_FORMAT_UNDEFINED);
+    new_pipeline.pipeline = builder.build_pipeline(device);
+
+    // Clean up shader modules.
+    vkDestroyShaderModule(device, vert_shader, nullptr);
+    vkDestroyShaderModule(device, frag_shader, nullptr);
+
+    return new_pipeline;
 }
 
 uint32_t material_bank::register_pipeline(const std::string& pipe_name,

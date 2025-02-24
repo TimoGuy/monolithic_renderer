@@ -4,6 +4,7 @@
 
 #include <vector>
 #include <vulkan/vulkan.h>
+#include "gltf_loader.h"
 
 namespace vk_pipeline
 {
@@ -23,6 +24,7 @@ public:
     void set_pipeline_layout(VkPipelineLayout layout);
     void set_shaders(VkShaderModule vertex_shader,
                      VkShaderModule fragment_shader);
+    void set_vertex_input(const gltf_loader::Vertex_input_description& vertex_desc);
     void set_input_topology(VkPrimitiveTopology topology);
     void set_polygon_mode(VkPolygonMode mode);
     void set_cull_mode(VkCullModeFlags cull_mode, VkFrontFace front_face);
@@ -36,6 +38,7 @@ public:
 private:
     VkPipelineLayout m_pipeline_layout;
     std::vector<VkPipelineShaderStageCreateInfo> m_shader_stages;
+    gltf_loader::Vertex_input_description m_vertex_input_desc;
     VkPipelineInputAssemblyStateCreateInfo m_input_assembly;
     VkPipelineRasterizationStateCreateInfo m_rasterizer;
     VkPipelineColorBlendAttachmentState m_color_blend_attachment;

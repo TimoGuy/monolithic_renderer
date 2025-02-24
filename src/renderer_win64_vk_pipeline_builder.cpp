@@ -51,6 +51,7 @@ void vk_pipeline::Graphics_pipeline_builder::clear()
 {
     // Set all default values.
     m_shader_stages.clear();
+    m_vertex_input_desc = {};
     m_input_assembly = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
     };
@@ -87,6 +88,12 @@ void vk_pipeline::Graphics_pipeline_builder::set_shaders(VkShaderModule vertex_s
     m_shader_stages.emplace_back(
         vk_util::pipeline_shader_stage_info(VK_SHADER_STAGE_FRAGMENT_BIT,
                                             fragment_shader));
+}
+
+void vk_pipeline::Graphics_pipeline_builder::set_vertex_input(
+    const gltf_loader::Vertex_input_description& vertex_desc)
+{
+    m_vertex_input_desc = vertex_desc;
 }
 
 void vk_pipeline::Graphics_pipeline_builder::set_input_topology(VkPrimitiveTopology topology)
@@ -175,6 +182,11 @@ VkPipeline vk_pipeline::Graphics_pipeline_builder::build_pipeline(VkDevice devic
 
     VkPipelineVertexInputStateCreateInfo vertex_input_info{
         .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+        .flags = m_vertex_input_desc.flags,
+        .vertexBindingDescriptionCount = static_cast<uint32_t>(m_vertex_input_desc.bindings.size()),
+        .pVertexBindingDescriptions = m_vertex_input_desc.bindings.data(),
+        .vertexAttributeDescriptionCount = static_cast<uint32_t>(m_vertex_input_desc.attributes.size()),
+        .pVertexAttributeDescriptions = m_vertex_input_desc.attributes.data(),
     };
 
     VkGraphicsPipelineCreateInfo pipeline_info{

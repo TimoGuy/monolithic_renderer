@@ -61,16 +61,40 @@ int32_t Monolithic_renderer::Impl::Load_assets_job::execute()
 {
     // @TODO: @THEA: add these material and model constructions into the actual soranin game as a constructor param.
 
+    std::vector<VkDescriptorSetLayout> layouts;
+    for (auto& desc_w_lay : m_pimpl.m_v_geometry_graphics_pass.per_frame_datas)
+    {
+        layouts.emplace_back(desc_w_lay.descriptor_layout);
+    }
+    layouts.emplace_back(
+        m_pimpl.m_v_geometry_graphics_pass.readonly_data.descriptor_layout);
+
+    VkFormat draw_format{ m_pimpl.m_v_HDR_draw_image.image.image_format };
+
     // Pipelines.
     TIMING_REPORT_START(reg_pipes);
     auto& v_device{ m_pimpl.m_v_device };
     material_bank::register_pipeline("debug_normals",
                                      material_bank::create_geometry_material_pipeline(
                                          v_device,
+                                         draw_format,
+                                         layouts,
                                          "assets/shaders/geommat_missing.vert.spv",
                                          "assets/shaders/geommat_missing.frag.spv"));
-    material_bank::register_pipeline("pbr_default", {});
-    material_bank::register_pipeline("pbr_cel_shaded", {});
+    material_bank::register_pipeline("pbr_default",
+                                     material_bank::create_geometry_material_pipeline(
+                                         v_device,
+                                         draw_format,
+                                         layouts,
+                                         "assets/shaders/geommat_missing.vert.spv",
+                                         "assets/shaders/geommat_missing.frag.spv"));
+    material_bank::register_pipeline("pbr_cel_shaded",
+                                     material_bank::create_geometry_material_pipeline(
+                                         v_device,
+                                         draw_format,
+                                         layouts,
+                                         "assets/shaders/geommat_missing.vert.spv",
+                                         "assets/shaders/geommat_missing.frag.spv"));
     TIMING_REPORT_END_AND_PRINT(reg_pipes, "Register Material Pipelines: ");
 
     // Materials.
@@ -835,7 +859,7 @@ bool build_vulkan_renderer__geometry_graphics_pass(VkDevice device,
         VkDescriptorBufferInfo camera_buffer_info{
             .buffer = camera_buffer.buffer,
             .offset = 0,
-            .range = camera_buffer.info.size,
+            .range = sizeof(camera::GPU_camera),
         };
         VkWriteDescriptorSet camera_buffer_write{
             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
@@ -896,6 +920,8 @@ bool build_vulkan_renderer__geometry_graphics_pass(VkDevice device,
 
     // @NOTE: Defer write buffers to descriptor set until once they are created.
     //        `write_bounding_spheres_to_descriptor_sets()`
+
+    return true;
 }
 
 bool build_vulkan_renderer__pipelines(VkDevice device,
@@ -1063,10 +1089,20 @@ bool Monolithic_renderer::Impl::build_vulkan_renderer()
                                                  m_v_descriptor_alloc,
                                                  m_v_sample_pass.descriptor_layout,
                                                  m_v_sample_pass.descriptor_set);
+    for (size_t i = 0; i < k_frame_overlap; i++)
+    {
+        // @TODO: add into a process func.
+        //        For `__geometry_graphics_pass()`
+        vk_buffer::initialize_base_sized_per_frame_buffer(m_v_vma_allocator,
+                                                          m_frames[i].geo_per_frame_buffer);
+    }
     result &= build_vulkan_renderer__geometry_graphics_pass(m_v_device,
+                                                            m_v_vma_allocator,
                                                             m_v_descriptor_alloc,
+                                                            m_frames,
                                                             m_v_geometry_graphics_pass.per_frame_datas,
-                                                            m_v_geometry_graphics_pass.readonly_data);
+                                                            m_v_geometry_graphics_pass.readonly_data,
+                                                            m_v_geometry_graphics_pass.readonly_culling_data);
     result &= build_vulkan_renderer__pipelines(m_v_device,
                                                m_v_sample_pass.descriptor_layout,
                                                m_v_sample_pass.pipeline_layout,
@@ -1310,6 +1346,8 @@ bool Monolithic_renderer::Impl::write_material_param_sets_to_descriptor_sets()
 
     VkWriteDescriptorSet writes[]{ material_param_sets_buffer_write, material_params_buffer_write };
     vkUpdateDescriptorSets(m_v_device, 2, writes, 0, nullptr);
+
+    return true;
 }
 
 bool Monolithic_renderer::Impl::write_bounding_spheres_to_descriptor_sets()
@@ -1333,6 +1371,8 @@ bool Monolithic_renderer::Impl::write_bounding_spheres_to_descriptor_sets()
     };
 
     vkUpdateDescriptorSets(m_v_device, 1, &culling_data_buffer_write, 0, nullptr);
+
+    return true;
 }
 
 // Tick procedures.

@@ -403,6 +403,9 @@ void vk_buffer::upload_changed_per_frame_data(const vk_util::Immediate_submit_su
                       VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                       VMA_MEMORY_USAGE_CPU_TO_GPU);
         frame_buffer.num_instance_data_elem_capacity = new_capacity;
+        
+        // @TODO: Implement updating the descriptor sets that use this buffer.
+        assert(false);
     }
 
     // Upload instance data.
@@ -449,6 +452,9 @@ void vk_buffer::upload_changed_per_frame_data(const vk_util::Immediate_submit_su
                           VMA_MEMORY_USAGE_GPU_ONLY);
 
         frame_buffer.num_indirect_cmd_elem_capacity = new_capacity;
+
+        // @TODO: Implement updating the descriptor sets that use this buffer.
+        assert(false);
     }
 
     // Upload indirect data.
