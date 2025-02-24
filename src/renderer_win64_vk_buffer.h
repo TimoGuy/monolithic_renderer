@@ -58,7 +58,7 @@ GPU_mesh_buffer upload_mesh_to_gpu(const vk_util::Immediate_submit_support& supp
 
 struct GPU_geo_resource_buffer
 {
-    Allocated_buffer material_param_index_buffer;
+    Allocated_buffer material_param_index_buffer;  // @TODO: add `local_` at beginning.
     Allocated_buffer material_param_set_buffer;
     Allocated_buffer bounding_sphere_buffer;
 };

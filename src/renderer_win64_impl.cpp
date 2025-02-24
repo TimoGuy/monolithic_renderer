@@ -12,6 +12,7 @@
 #include <cinttypes>
 #include <cstring>
 #include <iostream>
+#include "camera.h"
 #include "geo_instance.h"
 #include "gltf_loader.h"
 #include "imgui.h"
@@ -62,6 +63,12 @@ int32_t Monolithic_renderer::Impl::Load_assets_job::execute()
 
     // Pipelines.
     TIMING_REPORT_START(reg_pipes);
+    auto& v_device{ m_pimpl.m_v_device };
+    material_bank::register_pipeline("debug_normals",
+                                     material_bank::create_geometry_material_pipeline(
+                                         v_device,
+                                         "assets/shaders/geommat_missing.vert.spv",
+                                         "assets/shaders/geommat_missing.frag.spv"));
     material_bank::register_pipeline("pbr_default", {});
     material_bank::register_pipeline("pbr_cel_shaded", {});
     TIMING_REPORT_END_AND_PRINT(reg_pipes, "Register Material Pipelines: ");
@@ -216,6 +223,7 @@ int32_t Monolithic_renderer::Impl::Load_assets_job::execute()
                                                  m_pimpl.m_v_graphics_queue,
                                                  m_pimpl.m_v_vma_allocator,
                                                  material_bank::get_all_material_sets());
+    m_pimpl.write_material_param_sets_to_descriptor_sets();
     TIMING_REPORT_END_AND_PRINT(upload_material_sets, "Upload Material Param Indices and Material Sets: ");
 
     // Upload bounding sphere data.
@@ -226,6 +234,7 @@ int32_t Monolithic_renderer::Impl::Load_assets_job::execute()
                                               m_pimpl.m_v_graphics_queue,
                                               m_pimpl.m_v_vma_allocator,
                                               gltf_loader::get_all_bounding_spheres());
+    m_pimpl.write_bounding_spheres_to_descriptor_sets();
     TIMING_REPORT_END_AND_PRINT(upload_bs, "Upload Bounding Spheres: ");
 
     // Report memory heap usage.
@@ -790,6 +799,105 @@ bool build_vulkan_renderer__descriptors(VkDevice device,
     return true;
 }
 
+bool build_vulkan_renderer__geometry_graphics_pass(VkDevice device,
+                                                   VmaAllocator allocator,
+                                                   vk_desc::Descriptor_allocator& descriptor_alloc,
+                                                   Frame_data out_frames[],
+                                                   std::array<Descriptor_set_w_layout, k_frame_overlap>& out_per_frame_datas,
+                                                   Descriptor_set_w_layout& out_readonly_data,
+                                                   Descriptor_set_w_layout& out_readonly_culling_data)
+{
+    // Per-frame datas.
+    for (uint32_t i = 0; i < k_frame_overlap; i++)
+    {
+        auto& camera_buffer{ out_frames[i].camera_buffer };
+        auto& frame{ out_per_frame_datas[i] };
+        const auto& instance_buffer{
+            out_frames[i].geo_per_frame_buffer.instance_data_buffer };
+
+        camera_buffer =
+            vk_buffer::create_buffer(allocator,
+                                     sizeof(camera::GPU_camera),
+                                     VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                                     VMA_MEMORY_USAGE_CPU_TO_GPU);
+        
+        // Build layout.
+        vk_desc::Descriptor_layout_builder builder;
+        builder.add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+        builder.add_binding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+        frame.descriptor_layout =
+            builder.build(device, VK_SHADER_STAGE_VERTEX_BIT);
+        
+        // Build and allocate descriptor set.
+        frame.descriptor_set =
+            descriptor_alloc.allocate(device, frame.descriptor_layout);
+
+        VkDescriptorBufferInfo camera_buffer_info{
+            .buffer = camera_buffer.buffer,
+            .offset = 0,
+            .range = camera_buffer.info.size,
+        };
+        VkWriteDescriptorSet camera_buffer_write{
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .pNext = nullptr,
+            .dstSet = frame.descriptor_set,
+            .dstBinding = 0,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            .pBufferInfo = &camera_buffer_info,
+        };
+
+        VkDescriptorBufferInfo instance_buffer_info{
+            .buffer = instance_buffer.buffer,
+            .offset = 0,
+            .range = instance_buffer.info.size,
+        };
+        VkWriteDescriptorSet instance_buffer_write{
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .pNext = nullptr,
+            .dstSet = frame.descriptor_set,
+            .dstBinding = 1,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            .pBufferInfo = &instance_buffer_info,
+        };
+
+        VkWriteDescriptorSet writes[]{ camera_buffer_write, instance_buffer_write };
+        vkUpdateDescriptorSets(device, 2, writes, 0, nullptr);
+    }
+
+    // Readonly data.
+
+    // Build layout.
+    vk_desc::Descriptor_layout_builder builder;
+    builder.add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    builder.add_binding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    out_readonly_data.descriptor_layout =
+        builder.build(device, VK_SHADER_STAGE_VERTEX_BIT);
+
+    // Build and allocate descriptor set.
+    out_readonly_data.descriptor_set =
+        descriptor_alloc.allocate(device, out_readonly_data.descriptor_layout);
+
+    // @NOTE: Defer write buffers to descriptor set until once they are created.
+    //        `write_material_param_sets_to_descriptor_sets()`
+
+    // Readonly culling data.
+
+    // Build layout.
+    builder.clear();
+    builder.add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    out_readonly_culling_data.descriptor_layout =
+        builder.build(device, VK_SHADER_STAGE_COMPUTE_BIT);
+
+    // Build and allocate descriptor set.
+    out_readonly_culling_data.descriptor_set =
+        descriptor_alloc.allocate(device, out_readonly_culling_data.descriptor_layout);
+
+    // @NOTE: Defer write buffers to descriptor set until once they are created.
+    //        `write_bounding_spheres_to_descriptor_sets()`
+}
+
 bool build_vulkan_renderer__pipelines(VkDevice device,
                                       VkDescriptorSetLayout descriptor_layout,
                                       VkPipelineLayout& out_pipeline_layout,
@@ -952,9 +1060,13 @@ bool Monolithic_renderer::Impl::build_vulkan_renderer()
                                                      m_frames);
     result &= build_vulkan_renderer__descriptors(m_v_device,
                                                  m_v_HDR_draw_image.image.image_view,
-                                                 m_v_sample_pass.descriptor_alloc,
+                                                 m_v_descriptor_alloc,
                                                  m_v_sample_pass.descriptor_layout,
                                                  m_v_sample_pass.descriptor_set);
+    result &= build_vulkan_renderer__geometry_graphics_pass(m_v_device,
+                                                            m_v_descriptor_alloc,
+                                                            m_v_geometry_graphics_pass.per_frame_datas,
+                                                            m_v_geometry_graphics_pass.readonly_data);
     result &= build_vulkan_renderer__pipelines(m_v_device,
                                                m_v_sample_pass.descriptor_layout,
                                                m_v_sample_pass.pipeline_layout,
@@ -1060,7 +1172,7 @@ bool Monolithic_renderer::Impl::teardown_vulkan_renderer()
                                                   m_v_sample_pass.pipeline_layout,
                                                   m_v_sample_pass.pipeline);
     result &= teardown_vulkan_renderer__descriptors(m_v_device,
-                                                    m_v_sample_pass.descriptor_alloc,
+                                                    m_v_descriptor_alloc,
                                                     m_v_sample_pass.descriptor_layout);
     result &= teardown_vulkan_renderer__sync_structures(m_v_device, m_frames);
     result &= teardown_vulkan_renderer__cmd_structures(m_v_device, m_frames);
@@ -1158,6 +1270,69 @@ bool Monolithic_renderer::Impl::teardown_imgui()
     vkDestroyDescriptorPool(m_v_device, m_v_imgui_pool, nullptr);
 
     return result;
+}
+
+// Misc??????
+bool Monolithic_renderer::Impl::write_material_param_sets_to_descriptor_sets()
+{
+    auto& readonly_data{ m_v_geometry_graphics_pass.readonly_data };
+
+    // Write buffers to descriptor sets from `build_vulkan_renderer__geometry_graphics_pass()`.
+    VkDescriptorBufferInfo material_param_sets_buffer_info{
+        .buffer = m_v_geo_passes_resource_buffer.material_param_set_buffer.buffer,
+        .offset = 0,
+        .range = m_v_geo_passes_resource_buffer.material_param_set_buffer.info.size,
+    };
+    VkWriteDescriptorSet material_param_sets_buffer_write{
+        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+        .pNext = nullptr,
+        .dstSet = readonly_data.descriptor_set,
+        .dstBinding = 0,
+        .descriptorCount = 1,
+        .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+        .pBufferInfo = &material_param_sets_buffer_info,
+    };
+
+    VkDescriptorBufferInfo material_params_buffer_info{
+        .buffer = m_v_geo_passes_resource_buffer.material_param_index_buffer.buffer,
+        .offset = 0,
+        .range = m_v_geo_passes_resource_buffer.material_param_index_buffer.info.size,
+    };
+    VkWriteDescriptorSet material_params_buffer_write{
+        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+        .pNext = nullptr,
+        .dstSet = readonly_data.descriptor_set,
+        .dstBinding = 1,
+        .descriptorCount = 1,
+        .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+        .pBufferInfo = &material_params_buffer_info,
+    };
+
+    VkWriteDescriptorSet writes[]{ material_param_sets_buffer_write, material_params_buffer_write };
+    vkUpdateDescriptorSets(m_v_device, 2, writes, 0, nullptr);
+}
+
+bool Monolithic_renderer::Impl::write_bounding_spheres_to_descriptor_sets()
+{
+    auto& readonly_culling_data{ m_v_geometry_graphics_pass.readonly_culling_data };
+
+    // Write buffers to descriptor sets from `build_vulkan_renderer__geometry_graphics_pass()`.
+    VkDescriptorBufferInfo culling_data_buffer_info{
+        .buffer = m_v_geo_passes_resource_buffer.bounding_sphere_buffer.buffer,
+        .offset = 0,
+        .range = m_v_geo_passes_resource_buffer.bounding_sphere_buffer.info.size,
+    };
+    VkWriteDescriptorSet culling_data_buffer_write{
+        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+        .pNext = nullptr,
+        .dstSet = readonly_culling_data.descriptor_set,
+        .dstBinding = 0,
+        .descriptorCount = 1,
+        .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+        .pBufferInfo = &culling_data_buffer_info,
+    };
+
+    vkUpdateDescriptorSets(m_v_device, 1, &culling_data_buffer_write, 0, nullptr);
 }
 
 // Tick procedures.

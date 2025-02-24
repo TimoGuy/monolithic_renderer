@@ -11,6 +11,7 @@
 #include <GLFW/glfw3.h>
 #include "VkBootstrap.h"
 
+#include <array>
 #include <cinttypes>
 #include <cstring>
 #include <iostream>
@@ -29,7 +30,15 @@ struct Frame_data
     VkSemaphore swapchain_semaphore;
     VkSemaphore render_semaphore;
     VkFence render_fence;
+
+    vk_buffer::Allocated_buffer camera_buffer;
     vk_buffer::GPU_geo_per_frame_buffer geo_per_frame_buffer;
+};
+
+struct Descriptor_set_w_layout
+{
+    VkDescriptorSet descriptor_set;
+    VkDescriptorSetLayout descriptor_layout;
 };
 
 constexpr uint32_t k_frame_overlap{ 2 };
@@ -201,6 +210,10 @@ private:
     std::atomic_bool m_imgui_visible{ true };
     VkDescriptorPool m_v_imgui_pool;
 
+    // Misc?????
+    bool write_material_param_sets_to_descriptor_sets();
+    bool write_bounding_spheres_to_descriptor_sets();
+
     // Tick procedures.
     bool update_window();
     bool update_and_upload_render_data();
@@ -246,11 +259,24 @@ private:
         VkExtent2D                extent;
     } m_v_HDR_draw_image;
 
+    vk_desc::Descriptor_allocator m_v_descriptor_alloc;
     vk_buffer::GPU_geo_resource_buffer m_v_geo_passes_resource_buffer;
+
+    struct Geometry_graphics_pass
+    {
+        std::array<Descriptor_set_w_layout, k_frame_overlap> per_frame_datas;
+        Descriptor_set_w_layout readonly_data;
+        Descriptor_set_w_layout readonly_culling_data;  // For compute culling.
+    } m_v_geometry_graphics_pass;
+
+    inline Descriptor_set_w_layout& get_current_geom_per_frame_data()
+    {
+        return m_v_geometry_graphics_pass
+            .per_frame_datas[m_frame_number % k_frame_overlap];
+    }
 
     struct Sample_pass
     {
-        vk_desc::Descriptor_allocator descriptor_alloc;
         VkDescriptorSet descriptor_set;
         VkDescriptorSetLayout descriptor_layout;
         VkPipeline pipeline;

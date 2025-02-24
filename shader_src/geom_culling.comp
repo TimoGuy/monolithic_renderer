@@ -1,0 +1,44 @@
+#version 460
+#extension GL_GOOGLE_include_directive : enable
+
+layout (local_size_x = 16, local_size_y = 16) in;
+
+layout (rgba16f, set = 0, binding = 0) uniform image2D image;
+
+// Per frame data (set = 0).
+#include "geom_per_frame_datas_set0.glsl"
+
+// Matches `GPU_bounding_sphere`.
+struct Bounding_sphere
+{
+    vec4 origin_xyz_radius_w;
+};
+
+layout(std140, set = 1, binding = 0) readonly buffer Bounding_sphere_buffer
+{
+    Bounding_sphere bounding_spheres[];
+} bounding_sphere_buffer;
+
+
+void main()
+{
+    // @TODO: @FIXME: @THEA
+    assert(false) // This is fake code, but it's meant to not have this compile haha.
+
+
+
+    ivec2 texel_coord = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 size = imageSize(image);
+
+    if (texel_coord.x < size.x && texel_coord.y < size.y)
+    {
+        vec4 color = vec4(0.0, 0.0, 0.0, 1.0);
+        if (gl_LocalInvocationID.x != 0 && gl_LocalInvocationID.y != 0)
+        {
+            color.x = float(texel_coord.x) / size.x;
+            color.y = float(texel_coord.y) / size.y;
+        }
+
+        imageStore(image, texel_coord, color);
+    }
+}

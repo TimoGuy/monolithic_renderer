@@ -115,12 +115,14 @@ set(SHADER_SRC_DIR
     ${CMAKE_CURRENT_SOURCE_DIR}/shader_src)
 
 set(shader_includes
+    ${SHADER_SRC_DIR}/geom_per_frame_datas_set0.glsl
     ${SHADER_SRC_DIR}/geommat_static_mesh_vert.glsl
 )
 
 set(all_shaders
     ${SHADER_SRC_DIR}/colored_triangle.frag
     ${SHADER_SRC_DIR}/colored_triangle.vert
+    ${SHADER_SRC_DIR}/geom_culling.comp
     ${SHADER_SRC_DIR}/geommat_missing.frag
     ${SHADER_SRC_DIR}/geommat_missing.vert
     ${SHADER_SRC_DIR}/gradient.comp

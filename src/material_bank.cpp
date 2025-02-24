@@ -1,8 +1,10 @@
 #include "material_bank.h"
 
 #include <cassert>
+#include <iostream>
 #include <mutex>
 #include <unordered_map>
+#include "renderer_win64_vk_pipeline_builder.h"
 
 
 namespace material_bank
@@ -33,6 +35,34 @@ static std::mutex s_all_material_sets_mutex;
 
 
 // Pipeline.
+material_bank::GPU_pipeline material_bank::create_geometry_material_pipeline(
+    VkDevice device,
+    const char *vert_shader_path,
+    const char *frag_shader_path)
+{
+    VkShaderModule vert_shader;
+    if (!vk_pipeline::load_shader_module(vert_shader_path,
+                                         device,
+                                         vert_shader))
+    {
+        std::cerr << "ERROR: Geom mat vertex shader module loading failed." << std::endl;
+        assert(false);
+    }
+
+    VkShaderModule frag_shader;
+    if (!vk_pipeline::load_shader_module(vert_shader_path,
+                                         device,
+                                         frag_shader))
+    {
+        std::cerr << "ERROR: Geom mat fragment shader module loading failed." << std::endl;
+        assert(false);
+    }
+
+    // @TODO: @INCOMPLETE START HERE!!!! @THEA
+    // GPU_pipeline new_pipeline;
+    // vk_pipeline::Graphics_pipeline_builder{}
+}
+
 uint32_t material_bank::register_pipeline(const std::string& pipe_name,
                                           GPU_pipeline&& new_pipeline)
 {
