@@ -153,7 +153,8 @@ if(WIN32)
         list(APPEND SHADER_COMMAND "${SHADER_SOURCE}")
         list(APPEND SHADER_COMMAND "--target-env=vulkan1.3")
         list(APPEND SHADER_COMMAND "-Werror")  # Treat warnings as errors.
-        list(APPEND SHADER_COMMAND "-O")       # Optimize for performance.
+        # @NOTE: have driver optimize shaders. Apparently this can be harmful for desktop gpus.
+        # list(APPEND SHADER_COMMAND "-O")       # Optimize for performance.
         list(APPEND SHADER_COMMAND "-o")
         list(APPEND SHADER_COMMAND "${SHADER_PRODUCT}")
 
