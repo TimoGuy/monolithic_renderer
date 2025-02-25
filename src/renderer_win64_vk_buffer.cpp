@@ -1,5 +1,8 @@
 #include "renderer_win64_vk_buffer.h"
 
+#if _DEBUG
+#include <atomic>
+#endif  // _DEBUG
 #include <cassert>
 #include <iostream>
 #include <vk_mem_alloc.h>
@@ -12,6 +15,13 @@ namespace vk_buffer
 
 // @TODO: delete this! @THEA: I feel like for now I'm not gonna bother with changed indices until the instance pool data structure is more set in stone.
 // static std::vector<uint32_t> s_changed_indices;
+
+#if _DEBUG
+    // Since these should be immutable, assert that they aren't being attempted to change.
+    std::atomic_uint32_t s_num_times_uploaded_mesh{ 0 };
+    std::atomic_uint32_t s_num_times_uploaded_material_param_sets{ 0 };
+    std::atomic_uint32_t s_num_times_uploaded_bounding_spheres{ 0 };
+#endif  // _DEBUG
 
 }  // namespace vk_buffer
 
@@ -61,11 +71,11 @@ bool vk_buffer::expand_buffer(const vk_util::Immediate_submit_support& support,
                               VkQueue queue,
                               VmaAllocator allocator,
                               Allocated_buffer& in_out_buffer,
+                              size_t old_size,
                               size_t new_size,
                               VkBufferUsageFlags usage,
                               VmaMemoryUsage memory_usage)
 {
-    size_t old_size{ in_out_buffer.info.size };
     if (new_size < old_size)
     {
         std::cerr << "ERROR: new_size is smaller than old_size for expansion." << std::endl;
@@ -100,6 +110,8 @@ vk_buffer::GPU_mesh_buffer vk_buffer::upload_mesh_to_gpu(const vk_util::Immediat
                                                          std::vector<uint32_t>&& indices,
                                                          std::vector<GPU_vertex>&& vertices)
 {
+    assert((s_num_times_uploaded_mesh++) == 0);
+
     const size_t index_buffer_size{ indices.size() * sizeof(uint32_t) };
     const size_t vertex_buffer_size{ vertices.size() * sizeof(GPU_vertex) };
 
@@ -171,6 +183,8 @@ bool vk_buffer::upload_material_param_sets_to_gpu(
     VmaAllocator allocator,
     const std::vector<material_bank::GPU_material_set>& all_material_sets)
 {
+    assert((s_num_times_uploaded_material_param_sets++) == 0);
+
     // Write material param indices (`cooked_material_param_local_idx`)
     // (@NOTE: different from material idx)
     size_t num_mat_param_indices{ 0 };
@@ -205,15 +219,21 @@ bool vk_buffer::upload_material_param_sets_to_gpu(
                           VK_BUFFER_USAGE_TRANSFER_DST_BIT,
                       VMA_MEMORY_USAGE_GPU_ONLY);
 
+    out_resources.material_param_index_buffer_size =
+        mat_param_indices_buffer_size;
+
     size_t mat_param_sets_buffer_size{
         sizeof(uint32_t) * mat_param_set_start_indices.size() };
     auto& mat_param_sets_buffer{ out_resources.material_param_set_buffer };
     mat_param_sets_buffer =
         create_buffer(allocator,
-                      sizeof(uint32_t) * mat_param_set_start_indices.size(),
+                      mat_param_sets_buffer_size,
                       VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
                           VK_BUFFER_USAGE_TRANSFER_DST_BIT,
                       VMA_MEMORY_USAGE_GPU_ONLY);
+
+    out_resources.material_param_set_buffer_size =
+        mat_param_sets_buffer_size;
 
     auto staging_buffer{
         create_buffer(allocator,
@@ -255,6 +275,7 @@ bool vk_buffer::upload_bounding_spheres_to_gpu(
     VmaAllocator allocator,
     const std::vector<gpu_geo_data::GPU_bounding_sphere>& all_bounding_spheres)
 {
+    assert((s_num_times_uploaded_bounding_spheres++) == 0);
     static_assert(sizeof(gpu_geo_data::GPU_bounding_sphere) == sizeof(vec4));
 
     size_t bs_buffer_size{
@@ -267,6 +288,9 @@ bool vk_buffer::upload_bounding_spheres_to_gpu(
                       VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
                           VK_BUFFER_USAGE_TRANSFER_DST_BIT,
                       VMA_MEMORY_USAGE_GPU_ONLY);
+
+    out_resources.bounding_sphere_buffer_size =
+        bs_buffer_size;
 
     auto staging_buffer{
         create_buffer(allocator,
@@ -399,6 +423,8 @@ void vk_buffer::upload_changed_per_frame_data(const vk_util::Immediate_submit_su
                       queue,
                       allocator,
                       frame_buffer.instance_data_buffer,
+                      sizeof(gpu_geo_data::GPU_geo_instance_data) *
+                        frame_buffer.num_instance_data_elem_capacity,
                       sizeof(gpu_geo_data::GPU_geo_instance_data) * new_capacity,
                       VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                       VMA_MEMORY_USAGE_CPU_TO_GPU);
@@ -438,6 +464,8 @@ void vk_buffer::upload_changed_per_frame_data(const vk_util::Immediate_submit_su
                       queue,
                       allocator,
                       frame_buffer.indirect_command_buffer,
+                      sizeof(VkDrawIndexedIndirectCommand) *
+                        frame_buffer.num_indirect_cmd_elem_capacity,
                       sizeof(VkDrawIndexedIndirectCommand) * new_capacity,
                       VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                       VMA_MEMORY_USAGE_CPU_TO_GPU);

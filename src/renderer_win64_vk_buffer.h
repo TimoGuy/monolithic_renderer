@@ -38,6 +38,7 @@ bool expand_buffer(const vk_util::Immediate_submit_support& support,
                    VkQueue queue,
                    VmaAllocator allocator,
                    Allocated_buffer& in_out_buffer,
+                   size_t old_size,
                    size_t new_size,
                    VkBufferUsageFlags usage,
                    VmaMemoryUsage memory_usage);
@@ -58,9 +59,20 @@ GPU_mesh_buffer upload_mesh_to_gpu(const vk_util::Immediate_submit_support& supp
 
 struct GPU_geo_resource_buffer
 {
+    // @NOTE: All of these buffers are immutable.
+    //   All material param sets and their combinations should be frontloaded in every combination 
+    // they're designed to be in (i.e. they're deterministic).
+    //
+    //   I'm just writing this down bc I ended up trying to think about how to make these dynamic
+    // bc I thought from their context they would definitely be mutable. Perhaps in the future it
+    // may be good to have mutable material param sets???? But only if there's a REALLY good reason
+    // for it.  -Thea 2025/02/25
     Allocated_buffer material_param_index_buffer;  // @TODO: add `local_` at beginning.
+    size_t material_param_index_buffer_size;
     Allocated_buffer material_param_set_buffer;
-    Allocated_buffer bounding_sphere_buffer;
+    size_t material_param_set_buffer_size;
+    Allocated_buffer bounding_sphere_buffer;  // @NOTE: this one does not change in size!!! Since it's fixed to the 
+    size_t bounding_sphere_buffer_size;
 };
 
 // @NOTE: Mutates both `material_param_index_buffer` and `material_param_set_buffer`.

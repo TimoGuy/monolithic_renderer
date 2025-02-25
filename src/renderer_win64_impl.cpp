@@ -871,10 +871,13 @@ bool build_vulkan_renderer__geometry_graphics_pass(VkDevice device,
             .pBufferInfo = &camera_buffer_info,
         };
 
+        // @NOTE: @TODO: since this buffer is dynamic, when `expand_buffer()` is
+        //   run, make sure to actually rewrite the instance buffer descriptor set stuff.
         VkDescriptorBufferInfo instance_buffer_info{
             .buffer = instance_buffer.buffer,
             .offset = 0,
-            .range = instance_buffer.info.size,
+            .range = sizeof(gpu_geo_data::GPU_geo_instance_data) *
+                         out_frames[i].geo_per_frame_buffer.num_instance_data_elem_capacity,
         };
         VkWriteDescriptorSet instance_buffer_write{
             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
@@ -1317,7 +1320,7 @@ bool Monolithic_renderer::Impl::write_material_param_sets_to_descriptor_sets()
     VkDescriptorBufferInfo material_param_sets_buffer_info{
         .buffer = m_v_geo_passes_resource_buffer.material_param_set_buffer.buffer,
         .offset = 0,
-        .range = m_v_geo_passes_resource_buffer.material_param_set_buffer.info.size,
+        .range = m_v_geo_passes_resource_buffer.material_param_set_buffer_size,
     };
     VkWriteDescriptorSet material_param_sets_buffer_write{
         .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
@@ -1332,7 +1335,7 @@ bool Monolithic_renderer::Impl::write_material_param_sets_to_descriptor_sets()
     VkDescriptorBufferInfo material_params_buffer_info{
         .buffer = m_v_geo_passes_resource_buffer.material_param_index_buffer.buffer,
         .offset = 0,
-        .range = m_v_geo_passes_resource_buffer.material_param_index_buffer.info.size,
+        .range = m_v_geo_passes_resource_buffer.material_param_index_buffer_size,
     };
     VkWriteDescriptorSet material_params_buffer_write{
         .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
@@ -1358,7 +1361,7 @@ bool Monolithic_renderer::Impl::write_bounding_spheres_to_descriptor_sets()
     VkDescriptorBufferInfo culling_data_buffer_info{
         .buffer = m_v_geo_passes_resource_buffer.bounding_sphere_buffer.buffer,
         .offset = 0,
-        .range = m_v_geo_passes_resource_buffer.bounding_sphere_buffer.info.size,
+        .range = m_v_geo_passes_resource_buffer.bounding_sphere_buffer_size,
     };
     VkWriteDescriptorSet culling_data_buffer_write{
         .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,

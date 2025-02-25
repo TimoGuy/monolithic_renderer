@@ -1,40 +1,32 @@
 #version 460
 #extension GL_GOOGLE_include_directive : enable
 
-layout (local_size_x = 16, local_size_y = 16) in;
+layout (local_size_x = 128) in;
+
 
 // Per frame data (set = 0).
 #include "geom_per_frame_datas_set0.glsl"
+
+
+// Instance bounding spheres (set = 1).
 
 // Matches `GPU_bounding_sphere`.
 struct Bounding_sphere
 {
     vec4 origin_xyz_radius_w;
 };
-
 layout(std140, set = 1, binding = 0) readonly buffer Bounding_sphere_buffer
 {
     Bounding_sphere bounding_spheres[];
 } bounding_sphere_buffer;
 
-struct Indirect_draw_commands_data
-{
-    uint indexCount;
-    uint instanceCount;
-    uint firstIndex;
-    int  vertexOffset;
-    uint firstInstance;
-};
 
-layout(set = 2, binding = 0) readonly buffer Indirect_draw_commands_raw_buffer
+// Visible result data (set = 2).
+layout(std140, set = 2, binding = 0) writeonly buffer Visible_result_buffer
 {
-	Indirect_draw_commands_data commands[];
-} draw_commands_input;
+    uint results[];
+} visible_result_buffer;
 
-layout(set = 2, binding = 1) buffer Indirect_draw_commands_output_buffer
-{
-	Indirect_draw_commands_data commands[];
-} draw_commands_output;
 
 // Params.
 layout(push_constant) uniform Params
@@ -49,26 +41,23 @@ layout(push_constant) uniform Params
     uint  num_instances;
 } params;
 
-bool is_visible(uint object_id)
+
+bool is_visible(uint instance_idx)
 {
-    // @TODO: IMPLEMENT.
+    if (params.culling_enabled == 1)
+    {
+        // @TODO: IMPLEMENT.
+        return false;
+    }
     return true;
 }
 
 void main()
 {
-    // @TODO: @FIXME: @THEA
-    uint g_id = gl_GlobalInvocationID.x;
-    if (g_id < params.num_instances)
+    uint instance_idx = gl_GlobalInvocationID.x;
+    if (instance_idx < params.num_instances)
     {
-        if (is_visible(g_id))
-        {
-            uint count_idx;
-            uint batch_offset;
-
-            uint copy_to = batch_offset;
-            draw_commands_output.commands[copy_to] =
-                draw_commands_input.commands[g_id];
-        }
+        visible_result_buffer.results[instance_idx] =
+            (is_visible(instance_idx) ? 1 : 0);
     }
 }
