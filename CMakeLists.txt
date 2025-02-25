@@ -123,6 +123,7 @@ set(all_shaders
     ${SHADER_SRC_DIR}/colored_triangle.frag
     ${SHADER_SRC_DIR}/colored_triangle.vert
     ${SHADER_SRC_DIR}/geom_culling.comp
+    ${SHADER_SRC_DIR}/geom_write_draw_cmds.comp
     ${SHADER_SRC_DIR}/geommat_missing.frag
     ${SHADER_SRC_DIR}/geommat_missing.vert
     ${SHADER_SRC_DIR}/gradient.comp
