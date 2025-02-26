@@ -1,0 +1,35 @@
+{
+    "materials": [
+        {
+            "name": "missing",
+            "vert_shader": "geom_missing.vert",
+            "frag_shader": "geom_missing.frag",
+            "shadow_material": "opaque_shadow",
+            "z_prepass_material": "opaque_z_prepass",
+            "sets": {
+                "0": "per_frame_data",
+                "1": "material_param_set_indices"
+            }
+        },
+        {
+            "name": "opaque_z_prepass",
+            "vert_shader": "geommat_opaque_z_prepass.vert",
+            "frag_shader": "geommat_opaque_z_prepass.frag",
+            "shadow_material": null,
+            "z_prepass_material": null,
+            "sets": {
+                "0": "per_frame_data"
+            }
+        },
+        {
+            "name": "opaque_shadow",
+            "vert_shader": "geommat_opaque_shadow.vert",
+            "frag_shader": "geommat_opaque_shadow.frag",
+            "shadow_material": null,
+            "z_prepass_material": null,
+            "sets": {
+                "0": "per_frame_data_shadow"
+            }
+        }
+    ]
+}

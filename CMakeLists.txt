@@ -115,8 +115,9 @@ set(SHADER_SRC_DIR
     ${CMAKE_CURRENT_SOURCE_DIR}/shader_src)
 
 set(shader_includes
-    ${SHADER_SRC_DIR}/geom_per_frame_datas_set0.glsl
     ${SHADER_SRC_DIR}/geommat_static_mesh_vert.glsl
+    ${SHADER_SRC_DIR}/geom_per_frame_datas_set0.glsl
+    ${SHADER_SRC_DIR}/geom_material_sets_set1.glsl
 )
 
 set(all_shaders
@@ -126,6 +127,10 @@ set(all_shaders
     ${SHADER_SRC_DIR}/geom_write_draw_cmds.comp
     ${SHADER_SRC_DIR}/geommat_missing.frag
     ${SHADER_SRC_DIR}/geommat_missing.vert
+    ${SHADER_SRC_DIR}/geommat_opaque_z_prepass.frag
+    ${SHADER_SRC_DIR}/geommat_opaque_z_prepass.vert
+    ${SHADER_SRC_DIR}/geommat_opaque_shadow.frag
+    ${SHADER_SRC_DIR}/geommat_opaque_shadow.vert
     ${SHADER_SRC_DIR}/gradient.comp
 )
 

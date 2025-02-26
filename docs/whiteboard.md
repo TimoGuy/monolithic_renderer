@@ -41,6 +41,29 @@
     - `geom_write_draw_cmds.comp`: primitive-level lookup instance visibility lookup and write draw commands.
 
 
+Render steps:
+1. Shadow Cascades
+    For each cascade:
+    1. `geom_culling.comp`
+    1. `geom_write_draw_cmds.comp` -> cascade_cmds
+    1. `geom_depth_only.vert/.frag(cascade_cmds)` for only one material.
+1. Main camera
+    1. `geom_culling.comp`
+    1. `geom_write_draw_cmds.comp` -> opaque_z_prepass_cmds
+    1. `geom_depth_only.vert/.frag(opaque_z_prepass_cmds)` for only one material for everything (Opaque Z prepass).
+    1. `geom_write_draw_cmds.comp` -> per_material_cmds
+    1. `geommat_XXX(opaque-type).vert/.frag(per_material_cmds)` for each opaque material.
+
+    1. `geom_write_draw_cmds.comp` -> water_z_prepass_cmds
+    1. `geom_depth_only.vert/.frag` for only one material for everything (Water Z prepass).
+    1. `geom_extract_water_refraction.comp` -> water_refracted_texture
+    1. `geommat_XXX(water-type).vert/.frag(per_material_cmds)` for each water material.
+
+    1. `geommat_XXX(transparent-type).vert/.frag(DEPTH_ORDERED_DIRECT_DRAW)` for each transparent material.
+        > @NOTE: likely this will have to be directly drawn to make sure that there is the transparency order preserved. If you kept the ngnb
+        > @IDEA: have only one transparent shader. Have it be an uber shader. Sort all the instances in the order that they come in (might actually have to be primitive level) back to front and then do the same culling and rendering process. 
+
+
 
 
 
