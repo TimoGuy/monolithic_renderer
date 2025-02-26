@@ -136,7 +136,6 @@ if(WIN32)
         message(FATAL_ERROR "Cannot create a shaders target without any source files.")
     endif()
 
-    # set(OUTDATED_SHADERS_FOUND FALSE)
     set(ALL_SHADER_PRODUCTS)
         
     foreach(SHADER_SOURCE IN LISTS all_shaders)
