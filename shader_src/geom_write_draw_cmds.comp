@@ -1,5 +1,6 @@
 #version 460
 #extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_buffer_reference : require
 
 layout (local_size_x = 128) in;
 
@@ -8,14 +9,24 @@ layout (local_size_x = 128) in;
 #include "geom_per_frame_datas_set0.glsl"
 
 
-// Visible result data (set = 1).
-layout(std140, set = 1, binding = 0) readonly buffer Visible_result_buffer
+// Visible result data (buffer_reference).
+layout(buffer_reference, std140) readonly buffer Visible_result_buffer
 {
     uint results[];
-} visible_result_buffer;
+};
 
 
-// Indirect draw data (set = 2).
+// Indirect draw commands data (buffer_reference).
+layout(buffer_reference, std140) readonly buffer Primitive_group_base_index_buffer
+{
+	uint primitive_group_base_indices[];
+};
+
+layout(buffer_reference, std140) readonly buffer Count_buffer_index_buffer
+{
+	uint count_buffer_indices[];
+};
+
 struct Indirect_draw_commands_data
 {
     uint index_count;
@@ -24,44 +35,38 @@ struct Indirect_draw_commands_data
     int  vertex_offset;
     uint first_instance;
 };
-layout(set = 2, binding = 0) readonly buffer Indirect_draw_commands_all_buffer
+layout(buffer_reference) readonly buffer Indirect_draw_commands_input_buffer
 {
 	Indirect_draw_commands_data commands[];
-} draw_commands_input;
-
-layout(set = 2, binding = 1) buffer Indirect_draw_commands_output_buffer
-{
-	Indirect_draw_commands_data commands[];
-} draw_commands_output;
-
-struct Indirect_draw_command_offsets_data
-{
-	uint draw_buffer_base_idx;
-	uint count_buffer_idx;
-	uint pad0;
-	uint pad1;
 };
-layout(std140, set = 2, binding = 2) readonly buffer Indirect_draw_command_offsets_buffer
-{
-	Indirect_draw_command_offsets_data offsets[];
-} draw_command_offsets;
 
-layout(set = 2, binding = 3) buffer Indirect_draw_command_counts_buffer
+layout(buffer_reference) writeonly buffer Indirect_draw_commands_output_buffer
+{
+	Indirect_draw_commands_data commands[];
+};
+
+layout(buffer_reference) buffer Indirect_draw_command_counts_buffer
 {
 	uint counts[];
-} draw_command_counts;
+};
 
 
 // Params.
 layout(push_constant) uniform Params
 {
     uint num_primitives;
+    Visible_result_buffer visible_result_buffer;
+    Primitive_group_base_index_buffer base_indices;
+    Count_buffer_index_buffer count_buffer_indices;
+    Indirect_draw_commands_input_buffer draw_commands_input;
+    Indirect_draw_commands_output_buffer draw_commands_output;
+    Indirect_draw_command_counts_buffer draw_command_counts;
 } params;
 
 
 bool is_visible_lookup(uint instance_idx)
 {
-    return (visible_result_buffer.results[instance_idx] == 1 ? true : false);
+    return (params.visible_result_buffer.results[instance_idx] == 1 ? true : false);
 }
 
 void main()
@@ -69,18 +74,24 @@ void main()
     uint primitive_idx = gl_GlobalInvocationID.x;
     if (primitive_idx < params.num_primitives)
     {
-        uint instance_idx = draw_commands_input.commands[primitive_idx].first_instance;
+        uint instance_idx =
+            params.draw_commands_input.commands[primitive_idx].first_instance;
         if (is_visible_lookup(instance_idx))
         {
             // Add draw command to draw commands.
-            uint draw_buffer_base_idx = draw_command_offsets.offsets[primitive_idx].draw_buffer_base_idx;
-            uint count_buffer_idx     = draw_command_offsets.offsets[primitive_idx].count_buffer_idx;
+            uint draw_buffer_base_idx =
+                params.base_indices.primitive_group_base_indices[primitive_idx];
+            uint count_buffer_idx =
+                params.count_buffer_indices.count_buffer_indices[primitive_idx];
 
-            uint batch_offset = atomicAdd(draw_command_counts.counts[count_buffer_idx], 1);
+            uint batch_offset =
+                atomicAdd(
+                    params.draw_command_counts.counts[count_buffer_idx],
+                    1);
 
             uint copy_to = draw_buffer_base_idx + batch_offset;
-            draw_commands_output.commands[copy_to] =
-                draw_commands_input.commands[primitive_idx];
+            params.draw_commands_output.commands[copy_to] =
+                params.draw_commands_input.commands[primitive_idx];
         }
     }
 }

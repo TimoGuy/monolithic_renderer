@@ -400,6 +400,16 @@ bool gltf_loader::upload_combined_mesh(const vk_util::Immediate_submit_support& 
     return true;
 }
 
+bool gltf_loader::bind_combined_mesh(VkCommandBuffer cmd)
+{
+    assert(s_indices_base_vertex == 0);
+    assert(!s_cooked_models.empty());
+    assert(s_cooked_models.size() == s_cooked_bounding_spheres.size());
+    const VkDeviceSize offsets[]{ 0 };
+    vkCmdBindVertexBuffers(cmd, 0, 1, &s_static_mesh_buffer.vertex_buffer.buffer, offsets);
+    vkCmdBindIndexBuffer(cmd, s_static_mesh_buffer.index_buffer.buffer, 0, VK_INDEX_TYPE_UINT32);
+}
+
 const gltf_loader::Model& gltf_loader::get_model(uint32_t idx)
 {
     if (s_indices_base_vertex == 0)

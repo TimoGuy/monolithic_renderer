@@ -14,7 +14,10 @@ struct GPU_pipeline
 {
     VkPipeline pipeline;
     VkPipelineLayout pipeline_layout;
-    std::vector<VkDescriptorSet> descriptor_sets;
+    const GPU_pipeline* shadow_pipeline{ nullptr };
+    const GPU_pipeline* z_prepass_pipeline{ nullptr };
+
+    // std::vector<VkDescriptorSet> descriptor_sets;  @TODO
 };
 
 constexpr uint32_t k_invalid_material_idx{ (uint32_t)-1 };
@@ -40,8 +43,12 @@ GPU_pipeline create_geometry_material_pipeline(VkDevice device,
                                                const char* vert_shader_path,
                                                const char* frag_shader_path);
 
-uint32_t register_pipeline(const std::string& pipe_name,
-                           GPU_pipeline&& new_pipeline);
+uint32_t register_pipeline(const std::string& pipe_name);
+
+void define_pipeline(const std::string& pipe_name,
+                     const std::string& optional_shadow_pipe_name,
+                     const std::string& optional_z_prepass_pipe_name,
+                     GPU_pipeline&& new_pipeline);
 
 uint32_t get_pipeline_idx_from_name(const std::string& pipe_name);
 

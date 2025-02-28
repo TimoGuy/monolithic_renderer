@@ -98,20 +98,46 @@ material_bank::GPU_pipeline material_bank::create_geometry_material_pipeline(
     return new_pipeline;
 }
 
-uint32_t material_bank::register_pipeline(const std::string& pipe_name,
-                                          GPU_pipeline&& new_pipeline)
+uint32_t material_bank::register_pipeline(const std::string& pipe_name)
 {
+    assert(!pipe_name.empty());
     size_t emplace_idx;
     {
         std::lock_guard<std::mutex> lock{ s_all_pipelines_mutex };
         emplace_idx = s_all_pipelines.size();
-        s_all_pipelines.emplace_back(std::move(new_pipeline));
+        s_all_pipelines.emplace_back(GPU_pipeline{});
     }
     {
         std::lock_guard<std::mutex> lock{ s_pipe_name_to_idx_mutex };
         s_pipe_name_to_idx.emplace(std::string(pipe_name), static_cast<uint32_t>(emplace_idx));
     }
     return emplace_idx;
+}
+
+void material_bank::define_pipeline(const std::string& pipe_name,
+                                    const std::string& optional_shadow_pipe_name,
+                                    const std::string& optional_z_prepass_pipe_name,
+                                    GPU_pipeline&& new_pipeline)
+{
+    if (!optional_shadow_pipe_name.empty())
+    {
+        new_pipeline.shadow_pipeline =
+            &get_pipeline(
+                get_pipeline_idx_from_name(optional_shadow_pipe_name));
+    }
+
+    if (!optional_z_prepass_pipe_name.empty())
+    {
+        new_pipeline.z_prepass_pipeline =
+            &get_pipeline(
+                get_pipeline_idx_from_name(optional_z_prepass_pipe_name));
+    }
+
+    {
+        std::lock_guard<std::mutex> lock{ s_all_pipelines_mutex };
+        std::lock_guard<std::mutex> lock{ s_pipe_name_to_idx_mutex };
+        s_all_pipelines[s_pipe_name_to_idx.at(pipe_name)] = std::move(new_pipeline);
+    }
 }
 
 uint32_t material_bank::get_pipeline_idx_from_name(const std::string& pipe_name)

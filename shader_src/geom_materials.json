@@ -12,16 +12,6 @@
             }
         },
         {
-            "name": "opaque_z_prepass",
-            "vert_shader": "geommat_opaque_z_prepass.vert",
-            "frag_shader": "geommat_opaque_z_prepass.frag",
-            "shadow_material": null,
-            "z_prepass_material": null,
-            "sets": {
-                "0": "per_frame_data"
-            }
-        },
-        {
             "name": "opaque_shadow",
             "vert_shader": "geommat_opaque_shadow.vert",
             "frag_shader": "geommat_opaque_shadow.frag",
@@ -29,6 +19,16 @@
             "z_prepass_material": null,
             "sets": {
                 "0": "per_frame_data_shadow"
+            }
+        },
+        {
+            "name": "opaque_z_prepass",
+            "vert_shader": "geommat_opaque_z_prepass.vert",
+            "frag_shader": "geommat_opaque_z_prepass.frag",
+            "shadow_material": null,
+            "z_prepass_material": null,
+            "sets": {
+                "0": "per_frame_data"
             }
         }
     ]

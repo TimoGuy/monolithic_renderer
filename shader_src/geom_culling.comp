@@ -1,5 +1,6 @@
 #version 460
 #extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_buffer_reference : require
 
 layout (local_size_x = 128) in;
 
@@ -21,11 +22,11 @@ layout(std140, set = 1, binding = 0) readonly buffer Bounding_sphere_buffer
 } bounding_sphere_buffer;
 
 
-// Visible result data (set = 2).
-layout(std140, set = 2, binding = 0) writeonly buffer Visible_result_buffer
+// Visible result data (buffer_reference).
+layout(buffer_reference, std140) writeonly buffer Visible_result_buffer
 {
     uint results[];
-} visible_result_buffer;
+};
 
 
 // Params.
@@ -39,6 +40,7 @@ layout(push_constant) uniform Params
     float frustum_y_z;
     uint  culling_enabled;
     uint  num_instances;
+    Visible_result_buffer visible_result_buffer;
 } params;
 
 
@@ -47,7 +49,7 @@ bool is_visible(uint instance_idx)
     if (params.culling_enabled == 1)
     {
         // @TODO: IMPLEMENT.
-        return false;
+        return true;
     }
     return true;
 }
@@ -57,7 +59,7 @@ void main()
     uint instance_idx = gl_GlobalInvocationID.x;
     if (instance_idx < params.num_instances)
     {
-        visible_result_buffer.results[instance_idx] =
+        params.visible_result_buffer.results[instance_idx] =
             (is_visible(instance_idx) ? 1 : 0);
     }
 }

@@ -95,11 +95,19 @@ struct GPU_geo_per_frame_buffer
     Allocated_buffer instance_data_buffer;
     std::atomic_size_t num_instance_data_elems{ 0 };
     std::atomic_size_t num_instance_data_elem_capacity{ 0 };
+
     Allocated_buffer indirect_command_buffer;
     Allocated_buffer culled_indirect_command_buffer;
     std::atomic_size_t num_indirect_cmd_elems{ 0 };
     std::atomic_size_t num_indirect_cmd_elem_capacity{ 0 };
+
+    Allocated_buffer indirect_counts_buffer;
+    std::atomic_size_t num_indirect_counts_elems{ 0 };
+    std::atomic_size_t num_indirect_counts_elem_capacity{ 0 };
+
     const size_t expand_elems_interval{ 1024 };
+    const size_t expand_count_elems_interval{ 32 };
+
     std::atomic_bool changes_processed{ true };
 };
 

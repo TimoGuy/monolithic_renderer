@@ -3,8 +3,6 @@
 #include <array>
 #include <atomic>
 #include <cassert>
-#include <unordered_map>
-#include <vector>
 #include "gltf_loader.h"
 #include "material_bank.h"
 #include "timing_reporter_public.h"
@@ -20,7 +18,6 @@ namespace geo_instance
 {
 
 // Access the bucket by: Geo render pass and then Pipeline idx.
-using Pipeline_id_t = uint32_t;
 using Primitive_list_t = std::vector<Instance_primitive>;
 using Pipeline_primitive_list_map_t = std::unordered_map<Pipeline_id_t, Primitive_list_t>;
 constexpr size_t k_num_render_passes{ static_cast<uint8_t>(Geo_render_pass::NUM_GEO_RENDER_PASSES) };
@@ -148,9 +145,9 @@ std::vector<geo_instance::Geo_instance*> geo_instance::get_all_unique_instances(
     return instances;
 }
 
-std::vector<geo_instance::Instance_primitive*> geo_instance::get_all_primitives()
+geo_instance::Primitive_ptr_list_t geo_instance::get_all_primitives()
 {
-    std::vector<Instance_primitive*> inst_prims;
+    Primitive_ptr_list_t inst_prims;
 
     if (!s_flag_rebucketing)
     {
@@ -167,4 +164,75 @@ std::vector<geo_instance::Instance_primitive*> geo_instance::get_all_primitives(
     }
 
     return inst_prims;
+}
+
+geo_instance::Per_pipeline_primitive_ptr_list_t geo_instance::get_pipeline_grouped_primitives(
+    Geo_render_pass render_pass_id)
+{
+    Per_pipeline_primitive_ptr_list_t inst_prims_grouped;
+
+    if (!s_flag_rebucketing)
+    {
+        // @INCOMPLETE: asdfasdfasdfasdfasdf
+        // @NOTE: this may be the exact way this is addressed since this is the bucket notation stuff.
+        auto& render_pass{
+            s_bucketed_instance_primitives_list[static_cast<size_t>(render_pass_id)]
+        };
+        for (auto it = render_pass.begin(); it != render_pass.end(); it++)
+        {
+            for (auto& instance_primitive : it->second)
+            {
+                inst_prims_grouped[it->first].emplace_back(&instance_primitive);
+            }
+            inst_prims_grouped[it->first].shrink_to_fit();
+        }
+        ////////////////////////////////////
+    }
+
+    return inst_prims_grouped;
+}
+
+geo_instance::Primitive_render_group_list_t geo_instance::get_base_primitive_indices(Geo_render_pass render_pass_id)
+{
+    Primitive_render_group_list_t render_group_list;
+
+    if (!s_flag_rebucketing)
+    {
+        // @INCOMPLETE: asdfasdfasdfasdfasdf
+        // @NOTE: this may be the exact way this is addressed since this is the bucket notation stuff.
+        auto& render_pass{
+            s_bucketed_instance_primitives_list[static_cast<size_t>(render_pass_id)]
+        };
+        uint32_t current_primitive_idx{ 0 };
+        for (auto it = render_pass.begin(); it != render_pass.end(); it++)
+        {
+            render_group_list.emplace_back(it->first, current_primitive_idx);
+            current_primitive_idx += it->second.size();
+        }
+        render_group_list.shrink_to_fit();
+        ////////////////////////////////////
+    }
+
+    return render_group_list;
+}
+
+uint32_t geo_instance::get_number_primitives(Geo_render_pass render_pass_id)
+{
+    uint32_t count{ 0 };
+
+    if (!s_flag_rebucketing)
+    {
+        // @INCOMPLETE: asdfasdfasdfasdfasdf
+        // @NOTE: this may be the exact way this is addressed since this is the bucket notation stuff.
+        auto& render_pass{
+            s_bucketed_instance_primitives_list[static_cast<size_t>(render_pass_id)]
+        };
+        for (auto it = render_pass.begin(); it != render_pass.end(); it++)
+        {
+            count += it->second.size();
+        }
+        ////////////////////////////////////
+    }
+
+    return count;
 }

@@ -73,28 +73,38 @@ int32_t Monolithic_renderer::Impl::Load_assets_job::execute()
 
     // Pipelines.
     TIMING_REPORT_START(reg_pipes);
+    material_bank::register_pipeline("missing");
+    material_bank::register_pipeline("opaque_shadow");
+    material_bank::register_pipeline("opaque_z_prepass");
+    
     auto& v_device{ m_pimpl.m_v_device };
-    material_bank::register_pipeline("debug_normals",
-                                     material_bank::create_geometry_material_pipeline(
-                                         v_device,
-                                         draw_format,
-                                         layouts,
-                                         "assets/shaders/geommat_missing.vert.spv",
-                                         "assets/shaders/geommat_missing.frag.spv"));
-    material_bank::register_pipeline("pbr_default",
-                                     material_bank::create_geometry_material_pipeline(
-                                         v_device,
-                                         draw_format,
-                                         layouts,
-                                         "assets/shaders/geommat_missing.vert.spv",
-                                         "assets/shaders/geommat_missing.frag.spv"));
-    material_bank::register_pipeline("pbr_cel_shaded",
-                                     material_bank::create_geometry_material_pipeline(
-                                         v_device,
-                                         draw_format,
-                                         layouts,
-                                         "assets/shaders/geommat_missing.vert.spv",
-                                         "assets/shaders/geommat_missing.frag.spv"));
+    material_bank::define_pipeline("missing",
+                                   "opaque_shadow",
+                                   "opaque_z_prepass",
+                                   material_bank::create_geometry_material_pipeline(
+                                       v_device,
+                                       draw_format,
+                                       layouts,
+                                       "assets/shaders/geommat_missing.vert.spv",
+                                       "assets/shaders/geommat_missing.frag.spv"));
+    material_bank::define_pipeline("opaque_shadow",
+                                   "",
+                                   "",
+                                   material_bank::create_geometry_material_pipeline(
+                                       v_device,
+                                       draw_format,
+                                       layouts,
+                                       "assets/shaders/geommat_missing.vert.spv",
+                                       "assets/shaders/geommat_missing.frag.spv"));
+    material_bank::define_pipeline("opaque_z_prepass",
+                                   "",
+                                   "",
+                                   material_bank::create_geometry_material_pipeline(
+                                       v_device,
+                                       draw_format,
+                                       layouts,
+                                       "assets/shaders/geommat_opaque_shadow.vert.spv",
+                                       "assets/shaders/geommat_opaque_shadow.frag.spv"));
     TIMING_REPORT_END_AND_PRINT(reg_pipes, "Register Material Pipelines: ");
 
     // Materials.
@@ -516,7 +526,7 @@ bool build_vulkan_renderer__vulkan(GLFWwindow* window,
             .set_surface(out_surface)
             .set_required_features({
                 // @NOTE: @FEATURES: Enable required features right here
-                .multiDrawIndirect = VK_TRUE,         // So that vkCmdDrawIndexedIndirect() can be called with a >1 drawCount.
+                // .multiDrawIndirect = VK_TRUE,         // So that vkCmdDrawIndexedIndirect() can be called with a >1 drawCount. (@NOTE: not happening with current setup)
                 .depthClamp = VK_TRUE,				  // For shadow maps, this is really nice.
                 .fillModeNonSolid = VK_TRUE,          // To render wireframes.
                 .samplerAnisotropy = VK_TRUE,
@@ -661,7 +671,7 @@ bool build_vulkan_renderer__hdr_image(VmaAllocator allocator,
                    &out_hdr_image.allocation,
                    nullptr);
 
-	VkImageViewCreateInfo image_view_info{
+    VkImageViewCreateInfo image_view_info{
         vk_util::image_view_create_info(out_hdr_image.image_format,
                                         out_hdr_image.image,
                                         VK_IMAGE_ASPECT_COLOR_BIT)
@@ -1245,16 +1255,16 @@ bool Monolithic_renderer::Impl::build_imgui()
 
     VkDescriptorPoolSize pool_sizes[]{
         { VK_DESCRIPTOR_TYPE_SAMPLER, 1000 },
-		{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000 },
-		{ VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000 },
-		{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000 },
-		{ VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000 },
-		{ VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000 },
-		{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000 },
-		{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000 },
-		{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000 },
-		{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000 },
-		{ VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000 },
+        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000 },
+        { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000 },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000 },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000 },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000 },
+        { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000 },
     };
 
     VkDescriptorPoolCreateInfo pool_info{
@@ -1508,14 +1518,284 @@ void render__run_sample_pass(VkCommandBuffer cmd,
                             VK_PIPELINE_BIND_POINT_COMPUTE,
                             pipeline_layout,
                             0,
-                            1,
-                            &descriptor_set,
-                            0,
-                            nullptr);
+                            1, &descriptor_set,
+                            0, nullptr);
     vkCmdDispatch(cmd,
                   std::ceil(draw_extent.width / 16.0f),
                   std::ceil(draw_extent.height / 16.0f),
                   1);
+}
+
+void render__run_sunlight_shadow_cascades_pass()
+{
+}
+
+void render__run_camera_view_geometry_culling(VkCommandBuffer cmd,
+                                              VkDescriptorSet per_frame_desc_set,
+                                              VkDescriptorSet instance_bounding_sphere_desc_set,
+                                              VkDescriptorSet visible_result_data_desc_set,
+                                              uint32_t num_instances,
+                                              VkPipeline geom_culling_pipeline,
+                                              VkPipelineLayout geom_culling_pipeline_layout,
+                                              VkBuffer visible_result_data_buffer,
+                                              VkDeviceSize visible_result_data_buffer_size,
+                                              uint32_t graphics_queue_family_idx)
+{
+    // @NOTE: Visibility is calculated at a per-instance level here.
+    vkCmdBindPipeline(cmd,
+                      VK_PIPELINE_BIND_POINT_COMPUTE,
+                      geom_culling_pipeline);
+    vkCmdBindDescriptorSets(cmd,
+                            VK_PIPELINE_BIND_POINT_COMPUTE,
+                            geom_culling_pipeline_layout,
+                            0,
+                            1, &per_frame_desc_set,
+                            0, nullptr);
+    vkCmdBindDescriptorSets(cmd,
+                            VK_PIPELINE_BIND_POINT_COMPUTE,
+                            geom_culling_pipeline_layout,
+                            1,
+                            1, &instance_bounding_sphere_desc_set,
+                            0, nullptr);
+    vkCmdBindDescriptorSets(cmd,
+                            VK_PIPELINE_BIND_POINT_COMPUTE,
+                            geom_culling_pipeline_layout,
+                            2,
+                            1, &visible_result_data_desc_set,
+                            0, nullptr);
+    vkCmdDispatch(cmd,
+                  std::ceil(num_instances / 128.0f),
+                  1,
+                  1);
+
+    // Memory barrier for `geom_write_draw_cmds.comp`.
+    VkBufferMemoryBarrier visibility_results_buffer_barrier{
+        .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+        .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
+        .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
+        .srcQueueFamilyIndex = graphics_queue_family_idx,
+        .dstQueueFamilyIndex = graphics_queue_family_idx,
+        .buffer = visible_result_data_buffer,
+        .offset = 0,
+        .size = visible_result_data_buffer_size,
+    };
+    vkCmdPipelineBarrier(cmd,
+                         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                         0,
+                         0, nullptr,
+                         1, &visibility_results_buffer_barrier,
+                         0, nullptr);
+}
+
+void render__run_write_camera_view_geometry_draw_cmds(
+    VkCommandBuffer cmd,
+    VkDescriptorSet per_frame_desc_set,
+    VkDescriptorSet visible_result_data_desc_set,
+    VkDescriptorSet indirect_draw_cmds_data_desc_set,
+    uint32_t num_primitives,
+    const geo_instance::Primitive_render_group_list_t& primitive_render_groups,
+    VkPipeline geom_write_draw_cmds_pipeline,
+    VkPipelineLayout geom_write_draw_cmds_pipeline_layout,
+    VkBuffer indirect_draw_cmds_buffer,
+    VkBuffer indirect_draw_cmd_counts_buffer,
+    uint32_t graphics_queue_family_idx)
+{
+    // @TODO: Figure out if you wanna move the write draw cmds step to
+    //        its own thing so that the resulting buffer can be reused
+    //        for other rendering steps.
+
+    // Reset count buffer to 0.
+    vkCmdFillBuffer(cmd,
+                    indirect_draw_cmd_counts_buffer,
+                    0,
+                    sizeof(uint32_t) * primitive_render_groups.size(),
+                    0);
+
+    // Write draw commands, pulling from instance visibility buffer.
+    vkCmdBindPipeline(cmd,
+                      VK_PIPELINE_BIND_POINT_COMPUTE,
+                      geom_write_draw_cmds_pipeline);
+    vkCmdBindDescriptorSets(cmd,
+                            VK_PIPELINE_BIND_POINT_COMPUTE,
+                            geom_write_draw_cmds_pipeline_layout,
+                            0,
+                            1, &per_frame_desc_set,
+                            0, nullptr);
+    vkCmdBindDescriptorSets(cmd,
+                            VK_PIPELINE_BIND_POINT_COMPUTE,
+                            geom_write_draw_cmds_pipeline_layout,
+                            1,
+                            1, &visible_result_data_desc_set,
+                            0, nullptr);
+    vkCmdBindDescriptorSets(cmd,
+                            VK_PIPELINE_BIND_POINT_COMPUTE,
+                            geom_write_draw_cmds_pipeline_layout,
+                            2,
+                            1, &indirect_draw_cmds_data_desc_set,
+                            0, nullptr);
+    vkCmdDispatch(cmd,
+                  std::ceil(num_primitives / 128.0f),
+                  1,
+                  1);
+
+    // Memory buffer barrier to make sure indirect commands are written before vertex shaders run.
+    VkBufferMemoryBarrier buffer_barriers[]{
+        {
+            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+            .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
+            .dstAccessMask = VK_ACCESS_INDIRECT_COMMAND_READ_BIT,
+            .srcQueueFamilyIndex = graphics_queue_family_idx,
+            .dstQueueFamilyIndex = graphics_queue_family_idx,
+            .buffer = indirect_draw_cmds_buffer,
+            .offset = 0,
+            .size = sizeof(VkDrawIndexedIndirectCommand) * num_primitives,
+        },
+        {
+            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+            .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
+            .dstAccessMask = VK_ACCESS_INDIRECT_COMMAND_READ_BIT,
+            .srcQueueFamilyIndex = graphics_queue_family_idx,
+            .dstQueueFamilyIndex = graphics_queue_family_idx,
+            .buffer = indirect_draw_cmd_counts_buffer,
+            .offset = 0,
+            .size = sizeof(uint32_t) * primitive_render_groups.size(),
+            // @CONTINUE: Bc the above needs to be grouped per pipeline, like the bucketing.
+            //   and there needs to be a way to reference the correct bucket to access.
+            //   Ig, there is the method of just having push constants and dispatch a compute shader for every pipeline.
+        }
+    };
+    vkCmdPipelineBarrier(cmd,
+                         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                         VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT,
+                         0,
+                         0, nullptr,
+                         2, buffer_barriers,
+                         0, nullptr);
+
+    // @TODO: @FIXME: There's an issue where the draw counts are not actually instance-wide, but rather
+    //   material's pipelines-wide. So, though there will be organization there, effort needs to be taken
+    //   to make sure that the sizing and stuff like that is correct.
+    assert(false);
+}
+
+void render__run_opaque_geometry_pass(VkCommandBuffer cmd,
+                                      VkImageView image_view,
+                                      VkExtent2D draw_extent,
+                                      VkBuffer indirect_draw_buffer,
+                                      VkBuffer indirect_draw_count_buffer)
+{
+    VkRenderingAttachmentInfo color_attachment{
+        vk_util::attachment_info(image_view,
+                                 nullptr,
+                                 VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL) };
+    VkRenderingInfo render_info{
+        vk_util::rendering_info(draw_extent, &color_attachment, nullptr) };
+    
+    VkViewport viewport{
+        .x = 0,
+        .y = 0,
+        .width = static_cast<float_t>(draw_extent.width),
+        .height = static_cast<float_t>(draw_extent.height),
+        .minDepth = 0.0f,
+        .maxDepth = 1.0f,
+    };
+
+    VkRect2D scissor{
+        .offset{ .x = 0, .y = 0 },
+        .extent{ draw_extent },
+    };
+
+    auto grouped_primitives{
+        geo_instance::get_pipeline_grouped_primitives(geo_instance::Geo_render_pass::OPAQUE)
+    };
+
+    vkCmdBeginRendering(cmd, &render_info);
+
+    // Set initial values.
+    gltf_loader::bind_combined_mesh(cmd);
+    VkPipeline prev_pipeline{ nullptr };
+
+    // Draw all opaque primitives.
+    enum : uint8_t {
+        DRAW_Z_PREPASS = 0,
+        DRAW_MATERIAL_BASED_PASS,
+        NUM_PASSES
+    };
+    for (uint8_t pass = 0; pass < NUM_PASSES; pass++)
+    {
+        // Z prepass and then Material-based draw.
+        VkDeviceSize drawn_primitive_count{ 0 };
+        VkDeviceSize drawn_material_pipeline_count{ 0 };
+        for (auto& it : grouped_primitives)
+        {
+            auto pipeline_idx{ it.first };
+            auto& primitive_ptr_list{ it.second };
+
+            VkPipeline pipeline;
+            VkPipelineLayout pipeline_layout;
+            std::vector<VkDescriptorSet> desc_sets;
+            switch (pass)
+            {
+            case DRAW_Z_PREPASS:
+                assert(false);
+                pipeline =
+                    material_bank::get_pipeline(it.first)
+                        .z_prepass_pipeline
+                        ->pipeline;
+                pipeline_layout =
+                    material_bank::get_pipeline(it.first)
+                        .z_prepass_pipeline
+                        ->pipeline_layout;
+                // desc_sets.emplace_back(nullptr);
+                break;
+
+            case DRAW_MATERIAL_BASED_PASS:
+                pipeline =
+                    material_bank::get_pipeline(it.first).pipeline;
+                pipeline_layout =
+                    material_bank::get_pipeline(it.first).pipeline_layout;
+                // desc_sets.emplace_back(nullptr);
+                break;
+
+            default:
+                assert(false);
+                break;
+            }
+
+            if (pipeline != prev_pipeline)
+            {
+                vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+                vkCmdSetViewport(cmd, 0, 1, &viewport);
+                vkCmdSetScissor(cmd, 0, 1, &scissor);
+    
+                for (uint32_t i = 0; i < static_cast<uint32_t>(desc_sets.size()); i++)
+                {
+                    auto& desc_set{ desc_sets[i] };
+                    vkCmdBindDescriptorSets(cmd,
+                                            VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                            pipeline_layout,
+                                            i,
+                                            1, &desc_set,
+                                            0, nullptr);
+                }
+    
+                prev_pipeline = pipeline;
+            }
+    
+            vkCmdDrawIndexedIndirectCount(cmd,
+                                          indirect_draw_buffer,
+                                          drawn_primitive_count,
+                                          indirect_draw_count_buffer,
+                                          drawn_material_pipeline_count,
+                                          static_cast<uint32_t>(primitive_ptr_list.size()),
+                                          sizeof(VkDrawIndexedIndirectCommand));
+            drawn_primitive_count += primitive_ptr_list.size();
+            drawn_material_pipeline_count++;
+        }
+    }
+
+    vkCmdEndRendering(cmd);
 }
 
 void render__run_sample_geometry_pass(VkCommandBuffer cmd,
@@ -1566,7 +1846,7 @@ void render__blit_HDR_image_to_swapchain(VkCommandBuffer cmd,
                               hdr_image,
                               VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                               VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-	vk_util::transition_image(cmd,
+    vk_util::transition_image(cmd,
                               swapchain_image,
                               VK_IMAGE_LAYOUT_UNDEFINED,
                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
@@ -1620,7 +1900,7 @@ void render__prep_swapchain_image_for_presentation(VkCommandBuffer cmd,
 void render__end_command_buffer(VkCommandBuffer cmd)
 {
     // End command buffer.
-	VkResult err{ vkEndCommandBuffer(cmd) };
+    VkResult err{ vkEndCommandBuffer(cmd) };
     if (err)
     {
         std::cerr << "ERROR: End command buffer failed." << std::endl;
@@ -1746,6 +2026,12 @@ bool Monolithic_renderer::Impl::render()
                                 m_v_HDR_draw_image.image.image,
                                 VK_IMAGE_LAYOUT_GENERAL,
                                 VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+        render__run_sunlight_shadow_cascades_pass();
+
+        render__run_camera_view_geometry_culling();
+        render__run_write_camera_view_geometry_draw_cmds();
+        render__run_opaque_geometry_pass();
+
         render__run_sample_geometry_pass(cmd,
                                          m_v_HDR_draw_image.image.image_view,
                                          m_v_HDR_draw_image.extent,
@@ -1775,7 +2061,7 @@ bool Monolithic_renderer::Impl::render()
                                                         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
         }
     }
-	render__end_command_buffer(cmd);
+    render__end_command_buffer(cmd);
 
     // Finish frame.
     render__submit_commands_to_queue(cmd,

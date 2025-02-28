@@ -320,6 +320,7 @@ bool vk_buffer::upload_bounding_spheres_to_gpu(
 void vk_buffer::initialize_base_sized_per_frame_buffer(VmaAllocator allocator, GPU_geo_per_frame_buffer& frame_buffer)
 {
     size_t capacity{ frame_buffer.expand_elems_interval };
+    size_t count_capacity{ frame_buffer.expand_count_elems_interval };
 
     frame_buffer.instance_data_buffer =
         create_buffer(allocator,
@@ -342,6 +343,16 @@ void vk_buffer::initialize_base_sized_per_frame_buffer(VmaAllocator allocator, G
                       VMA_MEMORY_USAGE_GPU_ONLY);
     frame_buffer.num_indirect_cmd_elems = 0;
     frame_buffer.num_indirect_cmd_elem_capacity = capacity;
+
+    frame_buffer.indirect_counts_buffer =
+        create_buffer(allocator,
+                      sizeof(uint32_t) * count_capacity,
+                      VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+                          VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+                          VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
+                      VMA_MEMORY_USAGE_GPU_ONLY);
+    frame_buffer.num_indirect_counts_elems = 0;
+    frame_buffer.num_indirect_counts_elem_capacity = count_capacity;
 }
 
 // bool vk_buffer::set_new_changed_indices(std::vector<uint32_t>&& changed_indices,
