@@ -115,9 +115,12 @@ set(SHADER_SRC_DIR
     ${CMAKE_CURRENT_SOURCE_DIR}/shader_src)
 
 set(shader_includes
-    ${SHADER_SRC_DIR}/geommat_static_mesh_vert.glsl
-    ${SHADER_SRC_DIR}/geom_per_frame_datas_set0.glsl
+    ${SHADER_SRC_DIR}/geom_static_mesh_vert.glsl
+    ${SHADER_SRC_DIR}/geom_instance_data_br.glsl
+    ${SHADER_SRC_DIR}/geom_camera_set0.glsl
     ${SHADER_SRC_DIR}/geom_material_sets_set1.glsl
+    ${SHADER_SRC_DIR}/geom_vert_helper_functions.glsl
+    ${SHADER_SRC_DIR}/geom_material_sets_helper_functions.glsl
 )
 
 set(all_shaders

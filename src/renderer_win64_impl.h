@@ -193,6 +193,25 @@ public:
     // Fetch next jobs.
     Job_next_jobs_return_data fetch_next_jobs_callback();
 
+    // Geometry graphics render pass.
+    struct Geometry_graphics_pass
+    {
+        struct Per_frame_data
+        {
+            Descriptor_set_w_layout camera_data;
+            VkDeviceAddress geo_instance_buffer_address;
+            VkDeviceAddress visible_result_buffer_address;
+            VkDeviceAddress primitive_group_base_index_buffer_address;
+            VkDeviceAddress count_buffer_index_buffer_address;
+            VkDeviceAddress indirect_draw_cmds_input_buffer_address;
+            VkDeviceAddress indirect_draw_cmds_output_buffer_address;
+            VkDeviceAddress indirect_draw_cmd_counts_buffer_address;
+        };
+        std::array<Per_frame_data, k_frame_overlap> per_frame_datas;
+        Descriptor_set_w_layout material_param_sets_data;
+        Descriptor_set_w_layout bounding_spheres_data;
+    };
+
 private:
     // Win64 window setup/teardown.
     bool build_window();
@@ -260,16 +279,11 @@ private:
     } m_v_HDR_draw_image;
 
     vk_desc::Descriptor_allocator m_v_descriptor_alloc;
+
     vk_buffer::GPU_geo_resource_buffer m_v_geo_passes_resource_buffer;
+    Geometry_graphics_pass m_v_geometry_graphics_pass;
 
-    struct Geometry_graphics_pass
-    {
-        std::array<Descriptor_set_w_layout, k_frame_overlap> per_frame_datas;
-        Descriptor_set_w_layout readonly_data;
-        Descriptor_set_w_layout readonly_culling_data;  // For compute culling.
-    } m_v_geometry_graphics_pass;
-
-    inline Descriptor_set_w_layout& get_current_geom_per_frame_data()
+    inline Geometry_graphics_pass::Per_frame_data& get_current_geom_per_frame_data()
     {
         return m_v_geometry_graphics_pass
             .per_frame_datas[m_frame_number % k_frame_overlap];

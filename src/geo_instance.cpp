@@ -192,7 +192,7 @@ geo_instance::Per_pipeline_primitive_ptr_list_t geo_instance::get_pipeline_group
     return inst_prims_grouped;
 }
 
-geo_instance::Primitive_render_group_list_t geo_instance::get_base_primitive_indices(Geo_render_pass render_pass_id)
+geo_instance::Primitive_render_group_list_t geo_instance::get_all_base_primitive_indices()
 {
     Primitive_render_group_list_t render_group_list;
 
@@ -200,10 +200,8 @@ geo_instance::Primitive_render_group_list_t geo_instance::get_base_primitive_ind
     {
         // @INCOMPLETE: asdfasdfasdfasdfasdf
         // @NOTE: this may be the exact way this is addressed since this is the bucket notation stuff.
-        auto& render_pass{
-            s_bucketed_instance_primitives_list[static_cast<size_t>(render_pass_id)]
-        };
         uint32_t current_primitive_idx{ 0 };
+        for (auto& render_pass : s_bucketed_instance_primitives_list)
         for (auto it = render_pass.begin(); it != render_pass.end(); it++)
         {
             render_group_list.emplace_back(it->first, current_primitive_idx);

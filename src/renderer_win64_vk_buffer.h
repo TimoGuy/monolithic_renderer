@@ -93,15 +93,34 @@ bool upload_bounding_spheres_to_gpu(GPU_geo_resource_buffer& out_resources,
 struct GPU_geo_per_frame_buffer
 {
     Allocated_buffer instance_data_buffer;
+    VkDeviceAddress instance_data_buffer_address;
     std::atomic_size_t num_instance_data_elems{ 0 };
     std::atomic_size_t num_instance_data_elem_capacity{ 0 };
 
+    Allocated_buffer visible_result_buffer;
+    VkDeviceAddress visible_result_buffer_address;
+    std::atomic_size_t num_visible_result_elems{ 0 };
+    std::atomic_size_t num_visible_result_elem_capacity{ 0 };
+
+    Allocated_buffer primitive_group_base_index_buffer;
+    VkDeviceAddress primitive_group_base_index_buffer_address;
+    std::atomic_size_t num_primitive_group_base_index_elems{ 0 };
+    std::atomic_size_t num_primitive_group_base_index_elem_capacity{ 0 };
+
+    Allocated_buffer count_buffer_index_buffer;
+    VkDeviceAddress count_buffer_index_buffer_address;
+    std::atomic_size_t num_count_buffer_index_elems{ 0 };
+    std::atomic_size_t num_count_buffer_index_elem_capacity{ 0 };
+
     Allocated_buffer indirect_command_buffer;
+    VkDeviceAddress indirect_command_buffer_address;
     Allocated_buffer culled_indirect_command_buffer;
+    VkDeviceAddress culled_indirect_command_buffer_address;
     std::atomic_size_t num_indirect_cmd_elems{ 0 };
     std::atomic_size_t num_indirect_cmd_elem_capacity{ 0 };
 
     Allocated_buffer indirect_counts_buffer;
+    VkDeviceAddress indirect_counts_buffer_address;
     std::atomic_size_t num_indirect_counts_elems{ 0 };
     std::atomic_size_t num_indirect_counts_elem_capacity{ 0 };
 
@@ -111,7 +130,8 @@ struct GPU_geo_per_frame_buffer
     std::atomic_bool changes_processed{ true };
 };
 
-void initialize_base_sized_per_frame_buffer(VmaAllocator allocator,
+void initialize_base_sized_per_frame_buffer(VkDevice device,
+                                            VmaAllocator allocator,
                                             GPU_geo_per_frame_buffer& frame_buffer);
 
 // // @NOTE: Returns false if the previous requested change did not finish

@@ -24,9 +24,10 @@ public:
     void notify_windowevent_uniconification();
 #endif  // _WIN64
 
+    class Impl;
+
 private:
     Job_next_jobs_return_data fetch_next_jobs_callback() override;
 
-    class Impl;
     std::unique_ptr<Impl> m_pimpl;
 };

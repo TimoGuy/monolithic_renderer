@@ -62,7 +62,7 @@ Per_pipeline_primitive_ptr_list_t get_pipeline_grouped_primitives(Geo_render_pas
 using Base_primitive_idx_t = uint32_t;
 using Primitive_render_group_t = std::pair<Pipeline_id_t, Base_primitive_idx_t>;
 using Primitive_render_group_list_t = std::vector<Primitive_render_group_t>;
-Primitive_render_group_list_t get_base_primitive_indices(Geo_render_pass render_pass_id);
+Primitive_render_group_list_t get_all_base_primitive_indices();  // @TODO: reorder to higher up.
 
 uint32_t get_number_primitives(Geo_render_pass render_pass_id);
 

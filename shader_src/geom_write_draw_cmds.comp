@@ -5,8 +5,8 @@
 layout (local_size_x = 128) in;
 
 
-// Per frame data (set = 0).
-#include "geom_per_frame_datas_set0.glsl"
+// Instance data (buffer_reference).
+#include "geom_instance_data_br.glsl"
 
 
 // Visible result data (buffer_reference).
@@ -54,13 +54,13 @@ layout(buffer_reference) buffer Indirect_draw_command_counts_buffer
 // Params.
 layout(push_constant) uniform Params
 {
-    uint num_primitives;
-    Visible_result_buffer visible_result_buffer;
-    Primitive_group_base_index_buffer base_indices;
-    Count_buffer_index_buffer count_buffer_indices;
-    Indirect_draw_commands_input_buffer draw_commands_input;
+    uint                                 num_primitives;
+    Visible_result_buffer                visible_result_buffer;
+    Primitive_group_base_index_buffer    base_indices;
+    Count_buffer_index_buffer            count_buffer_indices;
+    Indirect_draw_commands_input_buffer  draw_commands_input;
     Indirect_draw_commands_output_buffer draw_commands_output;
-    Indirect_draw_command_counts_buffer draw_command_counts;
+    Indirect_draw_command_counts_buffer  draw_command_counts;
 } params;
 
 
@@ -79,7 +79,7 @@ void main()
         if (is_visible_lookup(instance_idx))
         {
             // Add draw command to draw commands.
-            uint draw_buffer_base_idx =
+            uint draw_cmds_base_idx =  // @OPTIMIZATION: (vram) could make the `count_buffer_indices` a lookup for `primitive_group_base_indices` so that there would only need to be one index per primitive group instead of per primitive.  -Thea 2025/03/02
                 params.base_indices.primitive_group_base_indices[primitive_idx];
             uint count_buffer_idx =
                 params.count_buffer_indices.count_buffer_indices[primitive_idx];
@@ -89,7 +89,7 @@ void main()
                     params.draw_command_counts.counts[count_buffer_idx],
                     1);
 
-            uint copy_to = draw_buffer_base_idx + batch_offset;
+            uint copy_to = draw_cmds_base_idx + batch_offset;
             params.draw_commands_output.commands[copy_to] =
                 params.draw_commands_input.commands[primitive_idx];
         }

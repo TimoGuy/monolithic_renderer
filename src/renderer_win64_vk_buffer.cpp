@@ -317,40 +317,105 @@ bool vk_buffer::upload_bounding_spheres_to_gpu(
     return true;
 }
 
-void vk_buffer::initialize_base_sized_per_frame_buffer(VmaAllocator allocator, GPU_geo_per_frame_buffer& frame_buffer)
+void vk_buffer::initialize_base_sized_per_frame_buffer(VkDevice device,
+                                                       VmaAllocator allocator,
+                                                       GPU_geo_per_frame_buffer& frame_buffer)
 {
     size_t capacity{ frame_buffer.expand_elems_interval };
     size_t count_capacity{ frame_buffer.expand_count_elems_interval };
 
+    // Get buffer device addresses.
+    VkBufferDeviceAddressInfo device_address_info{
+        .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
+    };
+
+    // Instance data buffer.
     frame_buffer.instance_data_buffer =
         create_buffer(allocator,
                       sizeof(gpu_geo_data::GPU_geo_instance_data) * capacity,
-                      VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                      VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+                          VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
                       VMA_MEMORY_USAGE_CPU_TO_GPU);
+    device_address_info.buffer = frame_buffer.instance_data_buffer.buffer;
+    frame_buffer.instance_data_buffer_address =
+        vkGetBufferDeviceAddress(device, &device_address_info);
     frame_buffer.num_instance_data_elems = 0;
     frame_buffer.num_instance_data_elem_capacity = capacity;
 
+    // Visible result buffer.
+    frame_buffer.visible_result_buffer =
+        create_buffer(allocator,
+                      sizeof(uint32_t) * capacity,
+                      VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+                          VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+                      VMA_MEMORY_USAGE_GPU_ONLY);
+    device_address_info.buffer = frame_buffer.visible_result_buffer.buffer;
+    frame_buffer.visible_result_buffer_address =
+        vkGetBufferDeviceAddress(device, &device_address_info);
+    frame_buffer.num_visible_result_elems = 0;
+    frame_buffer.num_visible_result_elem_capacity = capacity;
+
+    // Primitive group base indices buffer.
+    frame_buffer.primitive_group_base_index_buffer =
+        create_buffer(allocator,
+                      sizeof(uint32_t) * capacity,
+                      VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+                          VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+                      VMA_MEMORY_USAGE_CPU_TO_GPU);
+    device_address_info.buffer = frame_buffer.primitive_group_base_index_buffer.buffer;
+    frame_buffer.primitive_group_base_index_buffer_address =
+        vkGetBufferDeviceAddress(device, &device_address_info);
+    frame_buffer.num_primitive_group_base_index_elems = 0;
+    frame_buffer.num_primitive_group_base_index_elem_capacity = capacity;
+
+    // Count buffer indices buffer.
+    frame_buffer.count_buffer_index_buffer =
+        create_buffer(allocator,
+                      sizeof(uint32_t) * capacity,
+                      VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+                          VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+                      VMA_MEMORY_USAGE_CPU_TO_GPU);
+    device_address_info.buffer = frame_buffer.count_buffer_index_buffer.buffer;
+    frame_buffer.count_buffer_index_buffer_address =
+        vkGetBufferDeviceAddress(device, &device_address_info);
+    frame_buffer.num_count_buffer_index_elems = 0;
+    frame_buffer.num_count_buffer_index_elem_capacity = capacity;
+
+    // Indirect draw cmds input/output buffer.
     frame_buffer.indirect_command_buffer =
         create_buffer(allocator,
                       sizeof(VkDrawIndexedIndirectCommand) * capacity,
-                      VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                      VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+                          VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
                       VMA_MEMORY_USAGE_CPU_TO_GPU);
+    device_address_info.buffer = frame_buffer.indirect_command_buffer.buffer;
+    frame_buffer.indirect_command_buffer_address =
+        vkGetBufferDeviceAddress(device, &device_address_info);
     frame_buffer.culled_indirect_command_buffer =
         create_buffer(allocator,
                       sizeof(VkDrawIndexedIndirectCommand) * capacity,
                       VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-                          VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
+                          VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT |
+                          VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
                       VMA_MEMORY_USAGE_GPU_ONLY);
+    device_address_info.buffer = frame_buffer.culled_indirect_command_buffer.buffer;
+    frame_buffer.culled_indirect_command_buffer_address =
+        vkGetBufferDeviceAddress(device, &device_address_info);
     frame_buffer.num_indirect_cmd_elems = 0;
     frame_buffer.num_indirect_cmd_elem_capacity = capacity;
 
+    // Indirect draw cmd counts buffer.
     frame_buffer.indirect_counts_buffer =
         create_buffer(allocator,
                       sizeof(uint32_t) * count_capacity,
                       VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
                           VK_BUFFER_USAGE_TRANSFER_DST_BIT |
-                          VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
+                          VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT |
+                          VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
                       VMA_MEMORY_USAGE_GPU_ONLY);
+    device_address_info.buffer = frame_buffer.indirect_counts_buffer.buffer;
+    frame_buffer.indirect_counts_buffer_address =
+        vkGetBufferDeviceAddress(device, &device_address_info);
     frame_buffer.num_indirect_counts_elems = 0;
     frame_buffer.num_indirect_counts_elem_capacity = count_capacity;
 }
@@ -414,6 +479,11 @@ void vk_buffer::upload_changed_per_frame_data(const vk_util::Immediate_submit_su
     // @TODO: Maybe there could be a more optimal way of doing this but as
     //        long as it's not gonna be too slow, we're just gonna rewrite
     //        the whole buffer for both instance and indirect buffers.
+    
+    // Get buffer device addresses.
+    VkBufferDeviceAddressInfo device_address_info{
+        .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
+    };
 
     // Assign ids to all instances.
     auto unique_instances{ geo_instance::get_all_unique_instances() };
@@ -437,12 +507,13 @@ void vk_buffer::upload_changed_per_frame_data(const vk_util::Immediate_submit_su
                       sizeof(gpu_geo_data::GPU_geo_instance_data) *
                         frame_buffer.num_instance_data_elem_capacity,
                       sizeof(gpu_geo_data::GPU_geo_instance_data) * new_capacity,
-                      VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                      VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+                          VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
                       VMA_MEMORY_USAGE_CPU_TO_GPU);
+        device_address_info.buffer = frame_buffer.instance_data_buffer.buffer;
+        frame_buffer.instance_data_buffer_address =
+            vkGetBufferDeviceAddress(device, &device_address_info);
         frame_buffer.num_instance_data_elem_capacity = new_capacity;
-        
-        // @TODO: Implement updating the descriptor sets that use this buffer.
-        assert(false);
     }
 
     // Upload instance data.
@@ -462,8 +533,135 @@ void vk_buffer::upload_changed_per_frame_data(const vk_util::Immediate_submit_su
                        frame_buffer.instance_data_buffer.allocation);
     }
 
-    // Update indirect cmd buffer sizing.
+    // Update visible result buffer sizing.
+    if (unique_instances.size() > frame_buffer.num_visible_result_elem_capacity)
+    {
+        size_t new_capacity{
+            unique_instances.size() +
+                (unique_instances.size() % frame_buffer.expand_elems_interval) };
+        expand_buffer(support,  // @TODO: @NOTE: Change this to the non-copying buffer expansion bc everything gets calculated on the GPU.
+                      device,
+                      queue,
+                      allocator,
+                      frame_buffer.visible_result_buffer,
+                      sizeof(uint32_t) * frame_buffer.num_visible_result_elem_capacity,
+                      sizeof(uint32_t) * new_capacity,
+                      VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+                          VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+                      VMA_MEMORY_USAGE_GPU_ONLY);
+        device_address_info.buffer = frame_buffer.visible_result_buffer.buffer;
+        frame_buffer.visible_result_buffer_address =
+            vkGetBufferDeviceAddress(device, &device_address_info);
+        frame_buffer.num_visible_result_elem_capacity = new_capacity;
+    }
+    // @NOTE: Don't upload visible result data bc it all gets calculated on GPU.
+
+    // Collect primitive group indices and count buffer indices.
+    using Primitive_group_index_t = uint32_t;
+    using Count_buffer_index_t = uint32_t;
+    std::vector<Primitive_group_index_t> primitive_group_base_indices;
+    std::vector<Count_buffer_index_t> count_buffer_indices;
+
     auto all_primitives{ geo_instance::get_all_primitives() };
+    auto all_base_primitive_groups{ geo_instance::get_all_base_primitive_indices() };
+
+    primitive_group_base_indices.resize(all_primitives.size());
+    count_buffer_indices.resize(all_primitives.size());
+    size_t num_primitives_written{ 0 };
+
+    Count_buffer_index_t current_cnt_buf_idx{ 0 };
+    for (size_t i = 0; i < all_base_primitive_groups.size(); i++)
+    {
+        auto& primitive_group{ all_base_primitive_groups[i] };
+        uint32_t from_idx{ primitive_group.second };
+        uint32_t to_idx{ static_cast<uint32_t>(all_primitives.size()) };
+        if (i < all_base_primitive_groups.size() - 1)
+        {
+            to_idx = all_base_primitive_groups[i + 1].second;
+        }
+
+        for (uint32_t j = from_idx; j < to_idx; j++)
+        {
+            primitive_group_base_indices[j] = primitive_group.second;
+            count_buffer_indices[j]         = current_cnt_buf_idx;
+            num_primitives_written++;
+        }
+
+        current_cnt_buf_idx++;
+    }
+    assert(num_primitives_written == all_primitives.size());
+    assert(num_primitives_written == primitive_group_base_indices.size());
+    assert(num_primitives_written == count_buffer_indices.size());
+
+    // Update primitive group base indices buffer
+    // and count buffer indices buffer sizing.
+    assert(primitive_group_base_indices.size() == count_buffer_indices.size());
+    if (primitive_group_base_indices.size() >
+        frame_buffer.num_primitive_group_base_index_elem_capacity)
+    {
+        size_t new_capacity{
+            primitive_group_base_indices.size() +
+                (primitive_group_base_indices.size() %
+                    frame_buffer.expand_elems_interval) };
+
+        expand_buffer(support,
+                      device,
+                      queue,
+                      allocator,
+                      frame_buffer.primitive_group_base_index_buffer,
+                      sizeof(uint32_t) * frame_buffer.num_primitive_group_base_index_elem_capacity,
+                      sizeof(uint32_t) * new_capacity,
+                      VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+                          VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+                      VMA_MEMORY_USAGE_CPU_TO_GPU);
+        device_address_info.buffer = frame_buffer.primitive_group_base_index_buffer.buffer;
+        frame_buffer.primitive_group_base_index_buffer_address =
+            vkGetBufferDeviceAddress(device, &device_address_info);
+        frame_buffer.num_primitive_group_base_index_elem_capacity = new_capacity;
+
+        expand_buffer(support,
+                      device,
+                      queue,
+                      allocator,
+                      frame_buffer.count_buffer_index_buffer,
+                      sizeof(uint32_t) * frame_buffer.num_count_buffer_index_elem_capacity,
+                      sizeof(uint32_t) * new_capacity,
+                      VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+                          VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+                      VMA_MEMORY_USAGE_CPU_TO_GPU);
+        device_address_info.buffer = frame_buffer.count_buffer_index_buffer.buffer;
+        frame_buffer.count_buffer_index_buffer_address =
+            vkGetBufferDeviceAddress(device, &device_address_info);
+        frame_buffer.num_count_buffer_index_elem_capacity = new_capacity;
+    }
+
+    // Upload primitive group base indices.
+    {
+        void* data;
+        vmaMapMemory(allocator,
+                     frame_buffer.primitive_group_base_index_buffer.allocation,
+                     &data);
+        memcpy(data,
+               primitive_group_base_indices.data(),
+               sizeof(Primitive_group_index_t) * primitive_group_base_indices.size());
+        vmaUnmapMemory(allocator,
+                       frame_buffer.primitive_group_base_index_buffer.allocation);
+    }
+
+    // Upload count buffer indices.
+    {
+        void* data;
+        vmaMapMemory(allocator,
+                     frame_buffer.count_buffer_index_buffer.allocation,
+                     &data);
+        memcpy(data,
+               count_buffer_indices.data(),
+               sizeof(Count_buffer_index_t) * count_buffer_indices.size());
+        vmaUnmapMemory(allocator,
+                       frame_buffer.count_buffer_index_buffer.allocation);
+    }
+
+    // Update indirect cmd buffer sizing.
     if (all_primitives.size() > frame_buffer.num_indirect_cmd_elem_capacity)
     {
         size_t new_capacity{
@@ -478,8 +676,12 @@ void vk_buffer::upload_changed_per_frame_data(const vk_util::Immediate_submit_su
                       sizeof(VkDrawIndexedIndirectCommand) *
                         frame_buffer.num_indirect_cmd_elem_capacity,
                       sizeof(VkDrawIndexedIndirectCommand) * new_capacity,
-                      VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                      VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+                          VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
                       VMA_MEMORY_USAGE_CPU_TO_GPU);
+        device_address_info.buffer = frame_buffer.indirect_command_buffer.buffer;
+        frame_buffer.indirect_command_buffer_address =
+            vkGetBufferDeviceAddress(device, &device_address_info);
 
         // Simply destroy and recreate buffer since no copying needed.
         destroy_buffer(allocator, frame_buffer.culled_indirect_command_buffer);
@@ -487,16 +689,18 @@ void vk_buffer::upload_changed_per_frame_data(const vk_util::Immediate_submit_su
             create_buffer(allocator,
                           sizeof(VkDrawIndexedIndirectCommand) * new_capacity,
                           VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-                              VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
+                              VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT |
+                              VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
                           VMA_MEMORY_USAGE_GPU_ONLY);
+        device_address_info.buffer =
+            frame_buffer.culled_indirect_command_buffer.buffer;
+        frame_buffer.culled_indirect_command_buffer_address =
+            vkGetBufferDeviceAddress(device, &device_address_info);
 
         frame_buffer.num_indirect_cmd_elem_capacity = new_capacity;
-
-        // @TODO: Implement updating the descriptor sets that use this buffer.
-        assert(false);
     }
 
-    // Upload indirect data.
+    // Upload indirect cmds data.
     std::vector<VkDrawIndexedIndirectCommand> new_indirect_cmds;
     new_indirect_cmds.reserve(all_primitives.size());
     for (auto prim : all_primitives)
@@ -520,6 +724,35 @@ void vk_buffer::upload_changed_per_frame_data(const vk_util::Immediate_submit_su
         vmaUnmapMemory(allocator,
                        frame_buffer.indirect_command_buffer.allocation);
     }
+
+    // Count number of primitive groups to create count buffer.
+    uint32_t num_primitive_groups{
+        static_cast<uint32_t>(all_base_primitive_groups.size()) };
+
+    // Update indirect counts sizing.
+    if (num_primitive_groups > frame_buffer.num_indirect_counts_elem_capacity)
+    {
+        size_t new_capacity{
+            num_primitive_groups +
+                (num_primitive_groups % frame_buffer.expand_elems_interval) };
+        expand_buffer(support,
+                      device,
+                      queue,
+                      allocator,
+                      frame_buffer.indirect_counts_buffer,
+                      sizeof(uint32_t) * frame_buffer.num_indirect_counts_elem_capacity,
+                      sizeof(uint32_t) * new_capacity,
+                      VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+                          VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+                          VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT |
+                          VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+                      VMA_MEMORY_USAGE_GPU_ONLY);
+        device_address_info.buffer = frame_buffer.indirect_counts_buffer.buffer;
+        frame_buffer.indirect_counts_buffer_address =
+            vkGetBufferDeviceAddress(device, &device_address_info);
+        frame_buffer.num_indirect_counts_elem_capacity = new_capacity;
+    }
+    // @NOTE: Don't populate buffer bc it gets written to.
 
     frame_buffer.changes_processed = true;
 }

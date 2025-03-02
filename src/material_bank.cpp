@@ -134,8 +134,8 @@ void material_bank::define_pipeline(const std::string& pipe_name,
     }
 
     {
-        std::lock_guard<std::mutex> lock{ s_all_pipelines_mutex };
-        std::lock_guard<std::mutex> lock{ s_pipe_name_to_idx_mutex };
+        std::lock_guard<std::mutex> lock1{ s_all_pipelines_mutex };
+        std::lock_guard<std::mutex> lock2{ s_pipe_name_to_idx_mutex };
         s_all_pipelines[s_pipe_name_to_idx.at(pipe_name)] = std::move(new_pipeline);
     }
 }

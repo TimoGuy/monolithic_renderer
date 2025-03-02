@@ -9,7 +9,7 @@
 namespace camera
 {
 
-// Matches `geommat_static_mesh_vert.glsl`.
+// Matches `geom_static_mesh_vert.glsl`.
 struct GPU_camera
 {
     mat4 view;

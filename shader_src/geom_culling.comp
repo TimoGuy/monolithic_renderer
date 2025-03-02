@@ -6,8 +6,10 @@ layout (local_size_x = 128) in;
 
 
 // Per frame data (set = 0).
-#include "geom_per_frame_datas_set0.glsl"
+#include "geom_camera_set0.glsl"
 
+// Instance data (buffer_reference).
+#include "geom_instance_data_br.glsl"
 
 // Instance bounding spheres (set = 1).
 
@@ -32,14 +34,15 @@ layout(buffer_reference, std140) writeonly buffer Visible_result_buffer
 // Params.
 layout(push_constant) uniform Params
 {
-    float z_near;
-    float z_far;
-    float frustum_x_x;
-    float frustum_x_z;
-    float frustum_y_y;
-    float frustum_y_z;
-    uint  culling_enabled;
-    uint  num_instances;
+    float                 z_near;
+    float                 z_far;
+    float                 frustum_x_x;
+    float                 frustum_x_z;
+    float                 frustum_y_y;
+    float                 frustum_y_z;
+    uint                  culling_enabled;
+    uint                  num_instances;
+    Geo_instance_buffer   instance_buffer;
     Visible_result_buffer visible_result_buffer;
 } params;
 
@@ -48,7 +51,20 @@ bool is_visible(uint instance_idx)
 {
     if (params.culling_enabled == 1)
     {
+        uint bounding_sphere_idx =
+            params.instance_buffer
+                .instances[instance_idx]
+                .bounding_sphere_idx;
+        vec4 origin_xyz_radius_w =
+            bounding_sphere_buffer
+                .bounding_spheres[bounding_sphere_idx]
+                .origin_xyz_radius_w;
+        vec3 sphere_origin =
+            (params.instance_buffer.instances[instance_idx].transform *
+                vec4(origin_xyz_radius_w.xyz, 1.0)).xyz;
+
         // @TODO: IMPLEMENT.
+
         return true;
     }
     return true;
