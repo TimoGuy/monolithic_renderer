@@ -36,18 +36,40 @@ struct GPU_material_set
     std::vector<uint32_t> material_indexes;
 };
 
+// Feature processing.
+void emplace_descriptor_set_layout_feature(const std::string& feature_name,
+                                           VkDescriptorSetLayout desc_layout);
+
+void emplace_buffer_reference_feature(const std::string& feature_name);
+
 // Pipeline.
+enum class Camera_type
+{
+    MAIN_VIEW = 0,
+    SHADOW_VIEW,
+    NUM_CAMERA_TYPES
+};
+
+struct Material_parameters
+{
+    std::string param_name;
+    std::string param_type;
+};
+
 GPU_pipeline create_geometry_material_pipeline(VkDevice device,
                                                VkFormat draw_format,
-                                               std::vector<VkDescriptorSetLayout> descriptor_layouts,
+                                               bool has_z_prepass,
+                                               Camera_type camera_type,
+                                               bool use_material_params,
+                                               std::vector<Material_parameters> material_params,
                                                const char* vert_shader_path,
                                                const char* frag_shader_path);
 
 uint32_t register_pipeline(const std::string& pipe_name);
 
 void define_pipeline(const std::string& pipe_name,
-                     const std::string& optional_shadow_pipe_name,
                      const std::string& optional_z_prepass_pipe_name,
+                     const std::string& optional_shadow_pipe_name,
                      GPU_pipeline&& new_pipeline);
 
 uint32_t get_pipeline_idx_from_name(const std::string& pipe_name);

@@ -1,34 +1,49 @@
 {
-    "materials": [
+    "pipelines": [
         {
             "name": "missing",
-            "vert_shader": "geom_missing.vert",
-            "frag_shader": "geom_missing.frag",
-            "shadow_material": "opaque_shadow",
+            "vert_shader": "geommat_missing.vert",
+            "frag_shader": "geommat_missing.frag",
             "z_prepass_material": "opaque_z_prepass",
-            "sets": {
-                "0": "per_frame_data",
-                "1": "material_param_set_indices"
-            }
-        },
-        {
-            "name": "opaque_shadow",
-            "vert_shader": "geommat_opaque_shadow.vert",
-            "frag_shader": "geommat_opaque_shadow.frag",
-            "shadow_material": null,
-            "z_prepass_material": null,
-            "sets": {
-                "0": "per_frame_data_shadow"
+            "shadow_material": "opaque_shadow",
+            "camera_type": "main_view",
+            "use_material_params": true,
+            "material_params": {
+                "color": "vec4"
             }
         },
         {
             "name": "opaque_z_prepass",
             "vert_shader": "geommat_opaque_z_prepass.vert",
             "frag_shader": "geommat_opaque_z_prepass.frag",
-            "shadow_material": null,
             "z_prepass_material": null,
-            "sets": {
-                "0": "per_frame_data"
+            "shadow_material": null,
+            "camera_type": "main_view",
+            "use_material_params": false,
+            "material_params": {}
+        },
+        {
+            "name": "opaque_shadow",
+            "vert_shader": "geommat_opaque_shadow.vert",
+            "frag_shader": "geommat_opaque_shadow.frag",
+            "z_prepass_material": null,
+            "shadow_material": null,
+            "camera_type": "shadow_view",
+            "use_material_params": false,
+            "material_params": {}
+        }
+    ],
+    "materials": [
+        {
+            "name": "missing",
+            "pipeline_name": "missing",
+            "material_params": {
+                "color": {
+                    "x": 0.5,
+                    "y": 0.25,
+                    "z": 0.1,
+                    "w": 1.0
+                }
             }
         }
     ]

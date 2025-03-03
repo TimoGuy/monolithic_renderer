@@ -31,17 +31,60 @@ static std::mutex s_mat_set_name_to_idx_mutex;
 static std::vector<GPU_material_set> s_all_material_sets;
 static std::mutex s_all_material_sets_mutex;
 
+// Feature processing.
+static std::vector<std::string> s_valid_features;
+static std::unordered_map<std::string, VkDescriptorSetLayout> s_feature_to_desc_layout;
+
+void decorate_feature(const std::string& feature_name,
+                      std::vector<VkDescriptorSetLayout>& out_descriptor_layouts)
+{
+    if (std::find(s_valid_features.begin(),
+                  s_valid_features.end(),
+                  feature_name) == s_valid_features.end())
+    {
+        std::cerr << "ERROR: Feature name is invalid: " << feature_name << std::endl;
+        assert(false);
+        return;
+    }
+
+    // Add descriptor set layout if feature converts to a layout.
+    if (s_feature_to_desc_layout.find(feature_name) != s_feature_to_desc_layout.end())
+    {
+        out_descriptor_layouts.emplace_back(
+            s_feature_to_desc_layout.at(feature_name));
+    }
+}
+
 }  // namespace material_bank
 
+
+// Feature processing.
+void material_bank::emplace_descriptor_set_layout_feature(const std::string& feature_name,
+                                                          VkDescriptorSetLayout desc_layout)
+{
+    s_valid_features.emplace_back(feature_name);
+    s_feature_to_desc_layout.emplace(
+        std::pair<std::string, VkDescriptorSetLayout>{ feature_name, desc_layout });
+}
+
+void material_bank::emplace_buffer_reference_feature(const std::string& feature_name)
+{
+    s_valid_features.emplace_back(feature_name);
+    // @TODO: figure out the buffer reference feature system.
+}
 
 // Pipeline.
 material_bank::GPU_pipeline material_bank::create_geometry_material_pipeline(
     VkDevice device,
     VkFormat draw_format,
-    std::vector<VkDescriptorSetLayout> descriptor_layouts,
+    bool has_z_prepass,
+    std::vector<std::string> features,
     const char* vert_shader_path,
     const char* frag_shader_path)
 {
+    vk_pipeline::load_shader_module_spirv_reflect(vert_shader_path);
+    vk_pipeline::load_shader_module_spirv_reflect(frag_shader_path);
+
     VkShaderModule vert_shader;
     if (!vk_pipeline::load_shader_module(vert_shader_path,
                                          device,
@@ -61,6 +104,12 @@ material_bank::GPU_pipeline material_bank::create_geometry_material_pipeline(
     }
 
     // Create pipeline layout.
+    std::vector<VkDescriptorSetLayout> descriptor_layouts;
+    for (auto& feature : features)
+    {
+        decorate_feature(feature, descriptor_layouts);
+    }
+
     GPU_pipeline new_pipeline;
     VkPipelineLayoutCreateInfo layout_info{
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
@@ -83,10 +132,15 @@ material_bank::GPU_pipeline material_bank::create_geometry_material_pipeline(
     builder.set_vertex_input(gltf_loader::GPU_vertex::get_static_vertex_description());
     builder.set_input_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
     builder.set_polygon_mode(VK_POLYGON_MODE_FILL);
-    builder.set_cull_mode(VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE);
+    builder.set_cull_mode(VK_CULL_MODE_FRONT_BIT, VK_FRONT_FACE_CLOCKWISE);
     builder.set_multisampling_none();
     builder.disable_blending();
-    builder.disable_depthtest();
+
+    if (has_z_prepass)
+        builder.set_equal_nonwriting_depthtest();
+    else
+        builder.set_less_than_writing_depthtest();
+
     builder.set_color_attachment_format(draw_format);
     builder.set_depth_format(VK_FORMAT_UNDEFINED);
     new_pipeline.pipeline = builder.build_pipeline(device);
@@ -115,8 +169,8 @@ uint32_t material_bank::register_pipeline(const std::string& pipe_name)
 }
 
 void material_bank::define_pipeline(const std::string& pipe_name,
-                                    const std::string& optional_shadow_pipe_name,
                                     const std::string& optional_z_prepass_pipe_name,
+                                    const std::string& optional_shadow_pipe_name,
                                     GPU_pipeline&& new_pipeline)
 {
     if (!optional_shadow_pipe_name.empty())

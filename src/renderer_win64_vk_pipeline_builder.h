@@ -13,6 +13,8 @@ bool load_shader_module(const char* file_path,
                         VkDevice device,
                         VkShaderModule& out_shader_module);
 
+bool load_shader_module_spirv_reflect(const char* file_path);
+
 // @TODO: Add compute pipeline builder.
 
 class Graphics_pipeline_builder
@@ -33,6 +35,8 @@ public:
     void set_color_attachment_format(VkFormat format);
     void set_depth_format(VkFormat format);
     void disable_depthtest();
+    void set_less_than_writing_depthtest();
+    void set_equal_nonwriting_depthtest();
     VkPipeline build_pipeline(VkDevice device);
 
 private:

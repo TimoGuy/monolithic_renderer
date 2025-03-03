@@ -62,21 +62,19 @@ int32_t Monolithic_renderer::Impl::Load_assets_job::execute()
     // @TODO: @THEA: add these material and model constructions into the actual soranin game as a constructor param.
     // @TODO: change this into reading a json file for material info.
 
-    std::vector<VkDescriptorSetLayout> layouts;
-    for (auto& desc_w_lay : m_pimpl.m_v_geometry_graphics_pass.per_frame_datas)
-    {
-        layouts.emplace_back(desc_w_lay.descriptor_layout);
-    }
-    layouts.emplace_back(
-        m_pimpl.m_v_geometry_graphics_pass.readonly_data.descriptor_layout);
+    // Add material features.
+    // material_bank::emplace_descriptor_set_layout_feature("camera", asdfasdfasdf);
+    // material_bank::emplace_buffer_reference_feature("instance_data");
+    // material_bank::emplace_descriptor_set_layout_feature("material_sets", asdfasdfasdf);
 
-    VkFormat draw_format{ m_pimpl.m_v_HDR_draw_image.image.image_format };
 
     // Pipelines.
     TIMING_REPORT_START(reg_pipes);
+    VkFormat draw_format{ m_pimpl.m_v_HDR_draw_image.image.image_format };
+
     material_bank::register_pipeline("missing");
-    material_bank::register_pipeline("opaque_shadow");
     material_bank::register_pipeline("opaque_z_prepass");
+    material_bank::register_pipeline("opaque_shadow");  // @TODO: IMPLEMENT SHADOWS
     
     auto& v_device{ m_pimpl.m_v_device };
     material_bank::define_pipeline("missing",
@@ -85,16 +83,12 @@ int32_t Monolithic_renderer::Impl::Load_assets_job::execute()
                                    material_bank::create_geometry_material_pipeline(
                                        v_device,
                                        draw_format,
-                                       layouts,
-                                       "assets/shaders/geommat_missing.vert.spv",
-                                       "assets/shaders/geommat_missing.frag.spv"));
-    material_bank::define_pipeline("opaque_shadow",
-                                   "",
-                                   "",
-                                   material_bank::create_geometry_material_pipeline(
-                                       v_device,
-                                       draw_format,
-                                       layouts,
+                                       true,
+                                       material_bank::Camera_type::MAIN_VIEW,
+                                       true,
+                                       {
+                                           { "color", "vec4" },  // @TODO: START HERE!!!!! Start with implementing the data types for the material params struct(s). @NOTE: use spv_reflect!!!
+                                       },
                                        "assets/shaders/geommat_missing.vert.spv",
                                        "assets/shaders/geommat_missing.frag.spv"));
     material_bank::define_pipeline("opaque_z_prepass",
@@ -103,7 +97,23 @@ int32_t Monolithic_renderer::Impl::Load_assets_job::execute()
                                    material_bank::create_geometry_material_pipeline(
                                        v_device,
                                        draw_format,
-                                       layouts,
+                                       false,
+                                       material_bank::Camera_type::MAIN_VIEW,
+                                       false,
+                                       {},
+                                       "assets/shaders/geommat_opaque_z_prepass.vert.spv",
+                                       "assets/shaders/geommat_opaque_z_prepass.frag.spv"));
+    // @TODO: IMPLEMENT SHADOWS
+    material_bank::define_pipeline("opaque_shadow",
+                                   "",
+                                   "",
+                                   material_bank::create_geometry_material_pipeline(
+                                       v_device,
+                                       draw_format,
+                                       false,
+                                       material_bank::Camera_type::SHADOW_VIEW,
+                                       false,
+                                       {},
                                        "assets/shaders/geommat_opaque_shadow.vert.spv",
                                        "assets/shaders/geommat_opaque_shadow.frag.spv"));
     TIMING_REPORT_END_AND_PRINT(reg_pipes, "Register Material Pipelines: ");
@@ -881,46 +891,6 @@ bool build_vulkan_renderer__geometry_graphics_pass(VkDevice device,
             .pBufferInfo = &camera_buffer_info,
         };
         vkUpdateDescriptorSets(device, 1, &camera_buffer_write, 0, nullptr);
-
-        // Get buffer device addresses.
-        VkBufferDeviceAddressInfo device_address_info{
-            .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
-        };
-
-        // Instance data buffer.
-        device_address_info.buffer = frame_buffers.instance_data_buffer.buffer;
-        frame.geo_instance_buffer_address =
-            vkGetBufferDeviceAddress(device, &device_address_info);
-
-        // Visible result buffer.
-        device_address_info.buffer = frame_buffers.visible_result_buffer.buffer;
-        frame.visible_result_buffer_address =
-            vkGetBufferDeviceAddress(device, &device_address_info);
-
-        // Primitive group base indices buffer.
-        device_address_info.buffer = frame_buffers.visible_result_buffer.buffer;
-        frame.primitive_group_base_index_buffer_address =
-            vkGetBufferDeviceAddress(device, &device_address_info);
-
-        // Count buffer indices buffer.
-        device_address_info.buffer = frame_buffers.visible_result_buffer.buffer;
-        frame.count_buffer_index_buffer_address =
-            vkGetBufferDeviceAddress(device, &device_address_info);
-
-        // Indirect draw cmds input buffer.
-        device_address_info.buffer = frame_buffers.visible_result_buffer.buffer;
-        frame.indirect_draw_cmds_input_buffer_address =
-            vkGetBufferDeviceAddress(device, &device_address_info);
-
-        // Indirect draw cmds output buffer.
-        device_address_info.buffer = frame_buffers.visible_result_buffer.buffer;
-        frame.indirect_draw_cmds_output_buffer_address =
-            vkGetBufferDeviceAddress(device, &device_address_info);
-
-        // Indirect draw cmd counts buffer.
-        device_address_info.buffer = frame_buffers.visible_result_buffer.buffer;
-        frame.indirect_draw_cmd_counts_buffer_address =
-            vkGetBufferDeviceAddress(device, &device_address_info);
     }
 
     // Material param sets data.
@@ -1567,8 +1537,8 @@ struct GPU_geometry_culling_push_constants
 };
 
 void render__run_camera_view_geometry_culling(VkCommandBuffer cmd,
-                                              VkDescriptorSet per_frame_desc_set,
-                                              VkDescriptorSet instance_bounding_sphere_desc_set,
+                                              VkDescriptorSet camera_desc_set,
+                                              VkDescriptorSet bounding_sphere_desc_set,
                                               const GPU_geometry_culling_push_constants& params,
                                               VkPipeline geom_culling_pipeline,
                                               VkPipelineLayout geom_culling_pipeline_layout,
@@ -1584,13 +1554,13 @@ void render__run_camera_view_geometry_culling(VkCommandBuffer cmd,
                             VK_PIPELINE_BIND_POINT_COMPUTE,
                             geom_culling_pipeline_layout,
                             0,
-                            1, &per_frame_desc_set,
+                            1, &camera_desc_set,
                             0, nullptr);
     vkCmdBindDescriptorSets(cmd,
                             VK_PIPELINE_BIND_POINT_COMPUTE,
                             geom_culling_pipeline_layout,
                             1,
-                            1, &instance_bounding_sphere_desc_set,
+                            1, &bounding_sphere_desc_set,
                             0, nullptr);
     vkCmdPushConstants(cmd,
                        geom_culling_pipeline_layout,
@@ -1626,6 +1596,7 @@ void render__run_camera_view_geometry_culling(VkCommandBuffer cmd,
 struct GPU_write_draw_cmds_push_constants
 {
     uint32_t num_primitives;
+    VkDeviceAddress instance_buffer_address;
     VkDeviceAddress visible_result_buffer;
     VkDeviceAddress base_indices;
     VkDeviceAddress count_buffer_indices;
@@ -1636,7 +1607,6 @@ struct GPU_write_draw_cmds_push_constants
 
 void render__run_write_camera_view_geometry_draw_cmds(
     VkCommandBuffer cmd,
-    VkDescriptorSet per_frame_desc_set,
     const GPU_write_draw_cmds_push_constants& params,
     uint32_t num_primitive_render_groups,
     VkPipeline geom_write_draw_cmds_pipeline,
@@ -1660,12 +1630,6 @@ void render__run_write_camera_view_geometry_draw_cmds(
     vkCmdBindPipeline(cmd,
                       VK_PIPELINE_BIND_POINT_COMPUTE,
                       geom_write_draw_cmds_pipeline);
-    vkCmdBindDescriptorSets(cmd,
-                            VK_PIPELINE_BIND_POINT_COMPUTE,
-                            geom_write_draw_cmds_pipeline_layout,
-                            0,
-                            1, &per_frame_desc_set,
-                            0, nullptr);
     vkCmdPushConstants(cmd,
                        geom_write_draw_cmds_pipeline_layout,
                        VK_SHADER_STAGE_COMPUTE_BIT,
@@ -2066,10 +2030,40 @@ bool Monolithic_renderer::Impl::render()
                                   VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
         render__run_sunlight_shadow_cascades_pass();
 
+        auto& current_per_frame_data{ get_current_geom_per_frame_data() };
+
+        GPU_geometry_culling_push_constants geom_culling_pc{
+            // @TODO: implement!
+        };
+
         render__run_camera_view_geometry_culling(cmd,
-                                                 current_frame.geo_per_frame_buffer.);
-        render__run_write_camera_view_geometry_draw_cmds();
-        render__run_opaque_geometry_pass();
+                                                 current_per_frame_data.camera_data.descriptor_set,
+                                                 m_v_geometry_graphics_pass.bounding_spheres_data.descriptor_set,
+                                                 geom_culling_pc,
+                                                 m_v_geometry_graphics_pass.culling_pipeline,
+                                                 m_v_geometry_graphics_pass.culling_pipeline_layout,
+                                                 current_frame.geo_per_frame_buffer.visible_result_buffer.buffer,
+                                                 sizeof(uint32_t) * current_frame.geo_per_frame_buffer.num_visible_result_elems,
+                                                 m_v_graphics_queue_family_idx);
+
+        GPU_write_draw_cmds_push_constants write_draw_cmds_pc{
+            // @TODO: implement!
+        };
+
+        render__run_write_camera_view_geometry_draw_cmds(cmd,
+                                                         write_draw_cmds_pc,
+                                                         geo_instance::get_num_primitive_render_groups(
+                                                            geo_instance::Geo_render_pass::OPAQUE),
+                                                         m_v_geometry_graphics_pass.write_draw_cmds_pipeline,
+                                                         m_v_geometry_graphics_pass.write_draw_cmds_pipeline_layout,
+                                                         current_frame.geo_per_frame_buffer.culled_indirect_command_buffer.buffer,
+                                                         current_frame.geo_per_frame_buffer.indirect_counts_buffer.buffer,
+                                                         m_v_graphics_queue_family_idx);
+        render__run_opaque_geometry_pass(cmd,
+                                         m_v_HDR_draw_image.image.image_view,
+                                         m_v_HDR_draw_image.extent,
+                                         current_frame.geo_per_frame_buffer.culled_indirect_command_buffer.buffer,
+                                         current_frame.geo_per_frame_buffer.indirect_counts_buffer.buffer);
 
         render__run_sample_geometry_pass(cmd,
                                          m_v_HDR_draw_image.image.image_view,

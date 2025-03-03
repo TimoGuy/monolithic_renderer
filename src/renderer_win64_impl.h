@@ -199,17 +199,16 @@ public:
         struct Per_frame_data
         {
             Descriptor_set_w_layout camera_data;
-            VkDeviceAddress geo_instance_buffer_address;
-            VkDeviceAddress visible_result_buffer_address;
-            VkDeviceAddress primitive_group_base_index_buffer_address;
-            VkDeviceAddress count_buffer_index_buffer_address;
-            VkDeviceAddress indirect_draw_cmds_input_buffer_address;
-            VkDeviceAddress indirect_draw_cmds_output_buffer_address;
-            VkDeviceAddress indirect_draw_cmd_counts_buffer_address;
         };
         std::array<Per_frame_data, k_frame_overlap> per_frame_datas;
         Descriptor_set_w_layout material_param_sets_data;
         Descriptor_set_w_layout bounding_spheres_data;
+
+        VkPipeline culling_pipeline;
+        VkPipelineLayout culling_pipeline_layout;
+
+        VkPipeline write_draw_cmds_pipeline;
+        VkPipelineLayout write_draw_cmds_pipeline_layout;
     };
 
 private:

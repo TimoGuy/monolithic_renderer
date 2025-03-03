@@ -5,11 +5,11 @@
 #include <iostream>
 #include <vector>
 #include "renderer_win64_vk_util.h"
+#include "renderer_win64_vk_descriptor_layout_builder.h"
+#include "spirv_reflect.h"
 
 
-bool vk_pipeline::load_shader_module(const char* file_path,
-                                     VkDevice device,
-                                     VkShaderModule& out_shader_module)
+bool load_file_binary(const char* file_path, std::vector<uint32_t>& out_buffer)
 {
     std::ifstream file{ file_path, std::ios::ate | std::ios::binary };
     if (!file.is_open())
@@ -20,11 +20,25 @@ bool vk_pipeline::load_shader_module(const char* file_path,
 
     // Read spir-v.
     size_t file_size{ static_cast<size_t>(file.tellg()) };
-    std::vector<uint32_t> buffer(file_size / sizeof(uint32_t));
+    out_buffer.clear();
+    out_buffer.resize(file_size / sizeof(uint32_t));
 
     file.seekg(0);
-    file.read(reinterpret_cast<char*>(buffer.data()), file_size);
+    file.read(reinterpret_cast<char*>(out_buffer.data()), file_size);
     file.close();
+
+    return true;
+}
+
+bool vk_pipeline::load_shader_module(const char* file_path,
+                                     VkDevice device,
+                                     VkShaderModule& out_shader_module)
+{
+    std::vector<uint32_t> buffer;
+    if (!load_file_binary(file_path, buffer))
+    {
+        return false;
+    }
 
     // Create shader module.
     VkShaderModuleCreateInfo create_info{
@@ -43,6 +57,61 @@ bool vk_pipeline::load_shader_module(const char* file_path,
         return false;
     }
     out_shader_module = shader_module;
+
+    return true;
+}
+
+bool vk_pipeline::load_shader_module_spirv_reflect(const char* file_path)
+{
+    // I am not working on this anymore, bc there should be the list of required descriptor sets!
+    // I think that using reflection and trying to maintain this will be horribly inefficient and take too long to develop.
+    //   -Thea 2025/03/02
+    //assert(false);
+    
+    
+    
+    std::vector<uint32_t> buffer;
+    if (!load_file_binary(file_path, buffer))
+    {
+        return false;
+    }
+
+    // Load shader into reflection.
+    spv_reflect::ShaderModule shader_module{ buffer };
+    if (shader_module.GetResult() != SPV_REFLECT_RESULT_SUCCESS)
+    {
+        std::cerr
+            << "ERROR: could not create shader module reflection for shader file "
+            << file_path
+            << std::endl;
+        return false;
+    }
+
+    std::vector<SpvReflectDescriptorSet*> descriptor_sets;
+    SpvReflectResult result;
+
+    //uint32_t count;
+    //SpvReflectResult result{
+    //    shader_module.(&count, nullptr) };
+    //assert(result == SPV_REFLECT_RESULT_SUCCESS);
+    //descriptor_sets.resize(count);
+    //result = shader_module.EnumerateDescriptorSets(&count, descriptor_sets.data());
+    //assert(result == SPV_REFLECT_RESULT_SUCCESS);
+
+    //// Build descriptor sets.
+    //vk_desc::Descriptor_layout_builder builder;
+    //for (auto desc_set : descriptor_sets)
+    //{
+    //    builder.clear();
+    //    for (uint32_t i = 0; i < desc_set->binding_count; i++)
+    //    {
+    //        auto binding{ desc_set->bindings[i] };
+    //        builder.add_binding(
+    //            binding->binding,
+    //            static_cast<VkDescriptorType>(binding->descriptor_type));
+    //    }
+    //    //builder.build()
+    //}
 
     return true;
 }
@@ -158,6 +227,33 @@ void vk_pipeline::Graphics_pipeline_builder::disable_depthtest()
     m_depth_stencil.back = {};
     m_depth_stencil.minDepthBounds = 0.0f;
     m_depth_stencil.maxDepthBounds = 1.0f;
+}
+
+void vk_pipeline::Graphics_pipeline_builder::set_less_than_writing_depthtest()
+{
+    m_depth_stencil.depthTestEnable = VK_TRUE;
+    m_depth_stencil.depthWriteEnable = VK_TRUE;
+    m_depth_stencil.depthCompareOp = VK_COMPARE_OP_LESS;
+    m_depth_stencil.depthBoundsTestEnable = VK_FALSE;
+    m_depth_stencil.stencilTestEnable = VK_FALSE;
+    m_depth_stencil.front = {};
+    m_depth_stencil.back = {};
+    m_depth_stencil.minDepthBounds = 0.0f;
+    m_depth_stencil.maxDepthBounds = 1.0f;
+}
+
+void vk_pipeline::Graphics_pipeline_builder::set_equal_nonwriting_depthtest()
+{
+    m_depth_stencil.depthTestEnable = VK_TRUE;
+    m_depth_stencil.depthWriteEnable = VK_FALSE;
+    m_depth_stencil.depthCompareOp = VK_COMPARE_OP_EQUAL;
+    m_depth_stencil.depthBoundsTestEnable = VK_FALSE;
+    m_depth_stencil.stencilTestEnable = VK_FALSE;
+    m_depth_stencil.front = {};
+    m_depth_stencil.back = {};
+    m_depth_stencil.minDepthBounds = 0.0f;
+    m_depth_stencil.maxDepthBounds = 1.0f;
+
 }
 
 VkPipeline vk_pipeline::Graphics_pipeline_builder::build_pipeline(VkDevice device)

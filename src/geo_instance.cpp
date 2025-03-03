@@ -234,3 +234,21 @@ uint32_t geo_instance::get_number_primitives(Geo_render_pass render_pass_id)
 
     return count;
 }
+
+uint32_t geo_instance::get_num_primitive_render_groups(Geo_render_pass render_pass_id)
+{
+    uint32_t count{ 0 };
+
+    if (!s_flag_rebucketing)
+    {
+        // @INCOMPLETE: asdfasdfasdfasdfasdf
+        // @NOTE: this may be the exact way this is addressed since this is the bucket notation stuff.
+        auto& render_pass{
+            s_bucketed_instance_primitives_list[static_cast<size_t>(render_pass_id)]
+        };
+        count = render_pass.size();
+        ////////////////////////////////////
+    }
+
+    return count;
+}

@@ -66,4 +66,6 @@ Primitive_render_group_list_t get_all_base_primitive_indices();  // @TODO: reord
 
 uint32_t get_number_primitives(Geo_render_pass render_pass_id);
 
+uint32_t get_num_primitive_render_groups(Geo_render_pass render_pass_id);
+
 }  // namespace geo_instance
