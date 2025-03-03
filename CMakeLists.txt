@@ -62,8 +62,8 @@ add_library(${PROJECT_NAME}
     ${CMAKE_CURRENT_SOURCE_DIR}/src/renderer_win64_vk_pipeline_builder.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/renderer_win64_vk_util.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/renderer_win64_vk_util.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/spirv_reflect/spirv_reflect.cpp  # @DEPRECATE: Don't want to use
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/spirv_reflect/spirv_reflect.h    # @DEPRECATE: Don't want to use
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/spirv_reflect/spirv_reflect.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/spirv_reflect/spirv_reflect.h
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/vk-bootstrap/VkBootstrap.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/vk-bootstrap/VkBootstrap.h
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/vk-bootstrap/VkBootstrapDispatch.h
@@ -95,7 +95,7 @@ target_include_directories(${PROJECT_NAME}
         ${CMAKE_CURRENT_SOURCE_DIR}/third_party/glfw/include
         ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui
         ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui/backends
-        ${CMAKE_CURRENT_SOURCE_DIR}/third_party/spirv_reflect  # @DEPRECATE: Don't want to use
+        ${CMAKE_CURRENT_SOURCE_DIR}/third_party/spirv_reflect
         ${CMAKE_CURRENT_SOURCE_DIR}/third_party/vk-bootstrap
         ${CMAKE_CURRENT_SOURCE_DIR}/third_party/VulkanMemoryAllocator/include
         ${cglm_INCLUDE_DIR}

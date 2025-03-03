@@ -87,7 +87,7 @@ int32_t Monolithic_renderer::Impl::Load_assets_job::execute()
                                        material_bank::Camera_type::MAIN_VIEW,
                                        true,
                                        {
-                                           { "color", "vec4" },  // @TODO: START HERE!!!!! Start with implementing the data types for the material params struct(s). @NOTE: use spv_reflect!!!
+                                           { "color", material_bank::Mat_param_def_type::VEC4 },
                                        },
                                        "assets/shaders/geommat_missing.vert.spv",
                                        "assets/shaders/geommat_missing.frag.spv"));

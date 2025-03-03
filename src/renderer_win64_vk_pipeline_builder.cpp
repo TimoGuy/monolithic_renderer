@@ -81,22 +81,61 @@ bool vk_pipeline::load_shader_module_spirv_reflect(const char* file_path)
     if (shader_module.GetResult() != SPV_REFLECT_RESULT_SUCCESS)
     {
         std::cerr
-            << "ERROR: could not create shader module reflection for shader file "
+            << "ERROR: could not create shader module reflection -> "
             << file_path
             << std::endl;
         return false;
     }
 
+    // Check that it's a frag shader.
+    if (shader_module.GetShaderStage() != SPV_REFLECT_SHADER_STAGE_FRAGMENT_BIT)
+    {
+        std::cerr
+            << "ERROR: provided shader is not fragment shader -> "
+            << file_path
+            << std::endl;
+        return false;
+    }
+
+
+    // Check that shader has necessary material param struct.
     std::vector<SpvReflectDescriptorSet*> descriptor_sets;
     SpvReflectResult result;
 
-    //uint32_t count;
-    //SpvReflectResult result{
-    //    shader_module.(&count, nullptr) };
-    //assert(result == SPV_REFLECT_RESULT_SUCCESS);
-    //descriptor_sets.resize(count);
-    //result = shader_module.EnumerateDescriptorSets(&count, descriptor_sets.data());
-    //assert(result == SPV_REFLECT_RESULT_SUCCESS);
+    uint32_t count;
+    result = shader_module.EnumerateDescriptorSets(&count, nullptr);
+    assert(result == SPV_REFLECT_RESULT_SUCCESS);
+
+    descriptor_sets.resize(count);
+    result = shader_module.EnumerateDescriptorSets(&count, descriptor_sets.data());
+    assert(result == SPV_REFLECT_RESULT_SUCCESS);
+
+    for (auto desc_set : descriptor_sets)
+    for (size_t i = 0; i < desc_set->binding_count; i++)
+    {
+        auto binding{ desc_set->bindings[i] };
+        if (binding->descriptor_type == SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_BUFFER &&
+            std::string(binding->type_description->type_name) ==
+                "Material_param_definitions_buffer")
+        {
+            // @TODO: make these all a bunch of requirements that will crash
+            //   the program if not properly defined.
+            assert(binding->type_description->op == SpvOpTypeStruct);
+            assert(binding->type_description->member_count == 1);
+            assert(binding->type_description->members[0].op == SpvOpTypeRuntimeArray);
+            assert(binding->type_description->members[0].struct_type_description->op == SpvOpTypeStruct);
+            assert(std::string(binding->type_description->members[0].struct_type_description->type_name) == "Material_param_definition");
+            
+            // Iterate thru all struct members.
+            auto& struct_def{ *binding->type_description->members[0].struct_type_description };
+            for (size_t j = 0; j < struct_def.member_count; j++)
+            {
+                auto& member{ struct_def.members[j] };
+                // @TODO: START HERE!!!!!!!! GET THE CORRECT STUFF CONVERTED IN!!!!
+            }
+            std::cout << "SKIIIII" << std::endl;
+        }
+    }
 
     //// Build descriptor sets.
     //vk_desc::Descriptor_layout_builder builder;

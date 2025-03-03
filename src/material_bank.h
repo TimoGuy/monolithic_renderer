@@ -10,6 +10,50 @@
 namespace material_bank
 {
 
+// GPU_pipeline helpers.
+enum class Camera_type
+{
+    MAIN_VIEW = 0,
+    SHADOW_VIEW,
+    NUM_CAMERA_TYPES
+};
+
+enum class Mat_param_def_type
+{
+    UNSUPPORTED_TYPE = -1,
+    INT = 0,
+    UINT,
+    FLOAT,
+
+    IVEC2,
+    IVEC3,
+    IVEC4,
+    UVEC2,
+    UVEC3,
+    UVEC4,
+    VEC2,
+    VEC3,
+    VEC4,
+    
+    MAT3,
+    MAT4,
+
+    NUM_TYPES
+};
+
+struct Material_parameter_definition
+{
+    std::string param_name;
+    Mat_param_def_type param_type;
+
+    // @NOTE: Calculated in construction.
+    struct Calculated
+    {
+        size_t param_block_offset;
+        size_t param_size_padded;
+    } calculated;
+};
+
 struct GPU_pipeline
 {
     VkPipeline pipeline;
@@ -17,7 +61,14 @@ struct GPU_pipeline
     const GPU_pipeline* shadow_pipeline{ nullptr };
     const GPU_pipeline* z_prepass_pipeline{ nullptr };
 
-    // std::vector<VkDescriptorSet> descriptor_sets;  @TODO
+    Camera_type camera_type;
+    std::vector<Material_parameter_definition> material_param_definitions;
+
+    // @NOTE: Calculated in construction.
+    struct Calculated
+    {
+        size_t material_param_block_size_padded;
+    } calculated;
 };
 
 constexpr uint32_t k_invalid_material_idx{ (uint32_t)-1 };
@@ -36,34 +87,16 @@ struct GPU_material_set
     std::vector<uint32_t> material_indexes;
 };
 
-// Feature processing.
-void emplace_descriptor_set_layout_feature(const std::string& feature_name,
-                                           VkDescriptorSetLayout desc_layout);
-
-void emplace_buffer_reference_feature(const std::string& feature_name);
-
 // Pipeline.
-enum class Camera_type
-{
-    MAIN_VIEW = 0,
-    SHADOW_VIEW,
-    NUM_CAMERA_TYPES
-};
-
-struct Material_parameters
-{
-    std::string param_name;
-    std::string param_type;
-};
-
-GPU_pipeline create_geometry_material_pipeline(VkDevice device,
-                                               VkFormat draw_format,
-                                               bool has_z_prepass,
-                                               Camera_type camera_type,
-                                               bool use_material_params,
-                                               std::vector<Material_parameters> material_params,
-                                               const char* vert_shader_path,
-                                               const char* frag_shader_path);
+GPU_pipeline create_geometry_material_pipeline(
+    VkDevice device,
+    VkFormat draw_format,
+    bool has_z_prepass,
+    Camera_type camera_type,
+    bool use_material_params,
+    std::vector<Material_parameter_definition>&& material_param_definitions,
+    const char* vert_shader_path,
+    const char* frag_shader_path);
 
 uint32_t register_pipeline(const std::string& pipe_name);
 

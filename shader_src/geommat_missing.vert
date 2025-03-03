@@ -8,6 +8,7 @@
 #include "geom_material_sets_set1.glsl"
 
 layout (location = 0) out vec3 out_normal;
+layout (location = 1) out uint out_material_param_idx;
 
 layout (push_constant) uniform Params
 {
@@ -23,4 +24,5 @@ void main()
     vec3 world_pos = calc_world_position();
     gl_Position = calc_projection_view_position(world_pos);
     out_normal = calc_normal();
+    out_material_param_idx = get_material_param_idx();
 }

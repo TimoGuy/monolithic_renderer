@@ -31,58 +31,24 @@ static std::mutex s_mat_set_name_to_idx_mutex;
 static std::vector<GPU_material_set> s_all_material_sets;
 static std::mutex s_all_material_sets_mutex;
 
-// Feature processing.
-static std::vector<std::string> s_valid_features;
-static std::unordered_map<std::string, VkDescriptorSetLayout> s_feature_to_desc_layout;
-
-void decorate_feature(const std::string& feature_name,
-                      std::vector<VkDescriptorSetLayout>& out_descriptor_layouts)
-{
-    if (std::find(s_valid_features.begin(),
-                  s_valid_features.end(),
-                  feature_name) == s_valid_features.end())
-    {
-        std::cerr << "ERROR: Feature name is invalid: " << feature_name << std::endl;
-        assert(false);
-        return;
-    }
-
-    // Add descriptor set layout if feature converts to a layout.
-    if (s_feature_to_desc_layout.find(feature_name) != s_feature_to_desc_layout.end())
-    {
-        out_descriptor_layouts.emplace_back(
-            s_feature_to_desc_layout.at(feature_name));
-    }
-}
-
 }  // namespace material_bank
 
-
-// Feature processing.
-void material_bank::emplace_descriptor_set_layout_feature(const std::string& feature_name,
-                                                          VkDescriptorSetLayout desc_layout)
-{
-    s_valid_features.emplace_back(feature_name);
-    s_feature_to_desc_layout.emplace(
-        std::pair<std::string, VkDescriptorSetLayout>{ feature_name, desc_layout });
-}
-
-void material_bank::emplace_buffer_reference_feature(const std::string& feature_name)
-{
-    s_valid_features.emplace_back(feature_name);
-    // @TODO: figure out the buffer reference feature system.
-}
 
 // Pipeline.
 material_bank::GPU_pipeline material_bank::create_geometry_material_pipeline(
     VkDevice device,
     VkFormat draw_format,
     bool has_z_prepass,
-    std::vector<std::string> features,
+    Camera_type camera_type,
+    bool use_material_params,
+    std::vector<Material_parameter_definition>&& material_param_definitions,
     const char* vert_shader_path,
     const char* frag_shader_path)
 {
-    vk_pipeline::load_shader_module_spirv_reflect(vert_shader_path);
+    GPU_pipeline new_pipeline;
+    new_pipeline.camera_type = camera_type;
+    new_pipeline.material_param_definitions = std::move(material_param_definitions);
+
     vk_pipeline::load_shader_module_spirv_reflect(frag_shader_path);
 
     VkShaderModule vert_shader;
@@ -105,12 +71,11 @@ material_bank::GPU_pipeline material_bank::create_geometry_material_pipeline(
 
     // Create pipeline layout.
     std::vector<VkDescriptorSetLayout> descriptor_layouts;
-    for (auto& feature : features)
-    {
-        decorate_feature(feature, descriptor_layouts);
-    }
+    // for (auto& feature : features)  // @TODO
+    // {
+    //     decorate_feature(feature, descriptor_layouts);
+    // }
 
-    GPU_pipeline new_pipeline;
     VkPipelineLayoutCreateInfo layout_info{
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
         .pNext = nullptr,
