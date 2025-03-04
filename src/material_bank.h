@@ -44,7 +44,7 @@ enum class Mat_param_def_type
 struct Material_parameter_definition
 {
     std::string param_name;
-    Mat_param_def_type param_type;
+    Mat_param_def_type param_type{ Mat_param_def_type::UNSUPPORTED_TYPE };
 
     // @NOTE: Calculated in construction.
     struct Calculated

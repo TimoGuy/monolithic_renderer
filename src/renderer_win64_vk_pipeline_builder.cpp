@@ -4,6 +4,7 @@
 #include <fstream>
 #include <iostream>
 #include <vector>
+#include "material_bank.h"
 #include "renderer_win64_vk_util.h"
 #include "renderer_win64_vk_descriptor_layout_builder.h"
 #include "spirv_reflect.h"
@@ -110,6 +111,8 @@ bool vk_pipeline::load_shader_module_spirv_reflect(const char* file_path)
     result = shader_module.EnumerateDescriptorSets(&count, descriptor_sets.data());
     assert(result == SPV_REFLECT_RESULT_SUCCESS);
 
+    std::vector<material_bank::Material_parameter_definition> mat_param_defs;
+
     for (auto desc_set : descriptor_sets)
     for (size_t i = 0; i < desc_set->binding_count; i++)
     {
@@ -125,13 +128,80 @@ bool vk_pipeline::load_shader_module_spirv_reflect(const char* file_path)
             assert(binding->type_description->members[0].op == SpvOpTypeRuntimeArray);
             assert(binding->type_description->members[0].struct_type_description->op == SpvOpTypeStruct);
             assert(std::string(binding->type_description->members[0].struct_type_description->type_name) == "Material_param_definition");
-            
+
             // Iterate thru all struct members.
             auto& struct_def{ *binding->type_description->members[0].struct_type_description };
             for (size_t j = 0; j < struct_def.member_count; j++)
             {
                 auto& member{ struct_def.members[j] };
-                // @TODO: START HERE!!!!!!!! GET THE CORRECT STUFF CONVERTED IN!!!!
+                material_bank::Material_parameter_definition new_definition{
+                    .param_name = std::string(member.struct_member_name),
+                };
+
+                using Param_type = material_bank::Mat_param_def_type;
+                switch (member.op)
+                {
+                case SpvOpTypeInt:
+                    new_definition.param_type =
+                        (member.traits.numeric.scalar.signedness == 0 ?
+                            Param_type::UINT :
+                            Param_type::INT);
+                    break;
+
+                case SpvOpTypeFloat:
+                    new_definition.param_type = Param_type::FLOAT;
+                    break;
+
+                case SpvOpTypeVector:
+                    if (member.type_flags & SPV_REFLECT_TYPE_FLAG_INT)
+                    {
+                        bool is_signed{
+                            member.traits.numeric.scalar.signedness == 1 };
+                        switch (member.traits.numeric.vector.component_count)
+                        {
+                        case 2:
+                            new_definition.param_type =
+                                (is_signed ? Param_type::IVEC2 : Param_type::UVEC2);
+                            break;
+
+                        case 3:
+                            new_definition.param_type =
+                                (is_signed ? Param_type::IVEC3 : Param_type::UVEC3);
+                            break;
+
+                        case 4:
+                            new_definition.param_type =
+                                (is_signed ? Param_type::IVEC4 : Param_type::UVEC4);
+                            break;
+                        }
+                    }
+                    else if (member.type_flags & SPV_REFLECT_TYPE_FLAG_FLOAT)
+                    {
+                        switch (member.traits.numeric.vector.component_count)
+                        {
+                        case 2: new_definition.param_type = Param_type::VEC2; break;
+                        case 3: new_definition.param_type = Param_type::VEC3; break;
+                        case 4: new_definition.param_type = Param_type::VEC4; break;
+                        }
+                    }
+                    break;
+
+                case SpvOpTypeMatrix:
+                    if (member.traits.numeric.matrix.column_count == member.traits.numeric.matrix.row_count)
+                    {
+                        uint32_t dims{ member.traits.numeric.matrix.column_count };
+                        switch (dims)
+                        {
+                        case 3: new_definition.param_type = Param_type::MAT3; break;
+                        case 4: new_definition.param_type = Param_type::MAT4; break;
+                        }
+                    }
+                    break;
+                }
+
+                // @TODO: calculate memory offset and padded size.
+
+                // @TODO: add new definition to list.
             }
             std::cout << "SKIIIII" << std::endl;
         }
