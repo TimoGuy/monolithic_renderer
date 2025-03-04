@@ -5,6 +5,7 @@
 #include <vector>
 #include <vulkan/vulkan.h>
 #include "gltf_loader.h"
+#include "material_bank.h"
 
 namespace vk_pipeline
 {
@@ -13,7 +14,10 @@ bool load_shader_module(const char* file_path,
                         VkDevice device,
                         VkShaderModule& out_shader_module);
 
-bool load_shader_module_spirv_reflect(const char* file_path);
+bool load_shader_module_spirv_reflect_extract_material_params(
+    const char* file_path,
+    size_t& out_material_param_block_size_padded,
+    std::vector<material_bank::Material_parameter_definition>& out_material_param_definitions);
 
 // @TODO: Add compute pipeline builder.
 

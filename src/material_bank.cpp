@@ -49,8 +49,21 @@ material_bank::GPU_pipeline material_bank::create_geometry_material_pipeline(
     new_pipeline.camera_type = camera_type;
     new_pipeline.material_param_definitions = std::move(material_param_definitions);
 
-    vk_pipeline::load_shader_module_spirv_reflect(frag_shader_path);
+    // Verify material param definitions match and fill in calculated fields.
+    size_t reflected_material_param_block_size_padded;
+    std::vector<Material_parameter_definition> reflected_material_param_definitions;
+    vk_pipeline::load_shader_module_spirv_reflect_extract_material_params(
+        frag_shader_path,
+        reflected_material_param_block_size_padded,
+        reflected_material_param_definitions);
 
+    // @TODO: START HERE!!!!!
+    asdfasdfasdfasdf;
+
+    new_pipeline.calculated.material_param_block_size_padded =
+        reflected_material_param_block_size_padded;
+
+    // Create shader pipeline.
     VkShaderModule vert_shader;
     if (!vk_pipeline::load_shader_module(vert_shader_path,
                                          device,

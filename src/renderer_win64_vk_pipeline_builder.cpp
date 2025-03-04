@@ -4,7 +4,6 @@
 #include <fstream>
 #include <iostream>
 #include <vector>
-#include "material_bank.h"
 #include "renderer_win64_vk_util.h"
 #include "renderer_win64_vk_descriptor_layout_builder.h"
 #include "spirv_reflect.h"
@@ -62,15 +61,12 @@ bool vk_pipeline::load_shader_module(const char* file_path,
     return true;
 }
 
-bool vk_pipeline::load_shader_module_spirv_reflect(const char* file_path)
+bool vk_pipeline::load_shader_module_spirv_reflect_extract_material_params(
+    const char* file_path,
+    size_t& out_material_param_block_size_padded,
+    std::vector<material_bank::Material_parameter_definition>& out_material_param_definitions)
 {
-    // I am not working on this anymore, bc there should be the list of required descriptor sets!
-    // I think that using reflection and trying to maintain this will be horribly inefficient and take too long to develop.
-    //   -Thea 2025/03/02
-    //assert(false);
-    
-    
-    
+    // Load shader binary.
     std::vector<uint32_t> buffer;
     if (!load_file_binary(file_path, buffer))
     {
@@ -111,8 +107,7 @@ bool vk_pipeline::load_shader_module_spirv_reflect(const char* file_path)
     result = shader_module.EnumerateDescriptorSets(&count, descriptor_sets.data());
     assert(result == SPV_REFLECT_RESULT_SUCCESS);
 
-    std::vector<material_bank::Material_parameter_definition> mat_param_defs;
-
+    bool found{ false };
     for (auto desc_set : descriptor_sets)
     for (size_t i = 0; i < desc_set->binding_count; i++)
     {
@@ -128,22 +123,34 @@ bool vk_pipeline::load_shader_module_spirv_reflect(const char* file_path)
             assert(binding->type_description->members[0].op == SpvOpTypeRuntimeArray);
             assert(binding->type_description->members[0].struct_type_description->op == SpvOpTypeStruct);
             assert(std::string(binding->type_description->members[0].struct_type_description->type_name) == "Material_param_definition");
+            assert(std::string(binding->block.name) == "material_param_definitions_buffer");
+            assert(binding->block.member_count == 1);
+            assert(std::string(binding->block.members[0].name) == "definitions");
+            assert(binding->block.members[0].member_count > 0);
+
+            // Find total size of param struct.
+            size_t total_padded_size{ binding->block.members[0].padded_size };
+
+            // Clear definitions list.
+            out_material_param_definitions.clear();
 
             // Iterate thru all struct members.
             auto& struct_def{ *binding->type_description->members[0].struct_type_description };
+            auto& struct_block{ binding->block.members[0] };
             for (size_t j = 0; j < struct_def.member_count; j++)
             {
-                auto& member{ struct_def.members[j] };
+                // Decipher param type.
+                auto& member_def{ struct_def.members[j] };
                 material_bank::Material_parameter_definition new_definition{
-                    .param_name = std::string(member.struct_member_name),
+                    .param_name = std::string(member_def.struct_member_name),
                 };
 
                 using Param_type = material_bank::Mat_param_def_type;
-                switch (member.op)
+                switch (member_def.op)
                 {
                 case SpvOpTypeInt:
                     new_definition.param_type =
-                        (member.traits.numeric.scalar.signedness == 0 ?
+                        (member_def.traits.numeric.scalar.signedness == 0 ?
                             Param_type::UINT :
                             Param_type::INT);
                     break;
@@ -153,11 +160,11 @@ bool vk_pipeline::load_shader_module_spirv_reflect(const char* file_path)
                     break;
 
                 case SpvOpTypeVector:
-                    if (member.type_flags & SPV_REFLECT_TYPE_FLAG_INT)
+                    if (member_def.type_flags & SPV_REFLECT_TYPE_FLAG_INT)
                     {
                         bool is_signed{
-                            member.traits.numeric.scalar.signedness == 1 };
-                        switch (member.traits.numeric.vector.component_count)
+                            member_def.traits.numeric.scalar.signedness == 1 };
+                        switch (member_def.traits.numeric.vector.component_count)
                         {
                         case 2:
                             new_definition.param_type =
@@ -175,9 +182,9 @@ bool vk_pipeline::load_shader_module_spirv_reflect(const char* file_path)
                             break;
                         }
                     }
-                    else if (member.type_flags & SPV_REFLECT_TYPE_FLAG_FLOAT)
+                    else if (member_def.type_flags & SPV_REFLECT_TYPE_FLAG_FLOAT)
                     {
-                        switch (member.traits.numeric.vector.component_count)
+                        switch (member_def.traits.numeric.vector.component_count)
                         {
                         case 2: new_definition.param_type = Param_type::VEC2; break;
                         case 3: new_definition.param_type = Param_type::VEC3; break;
@@ -187,9 +194,9 @@ bool vk_pipeline::load_shader_module_spirv_reflect(const char* file_path)
                     break;
 
                 case SpvOpTypeMatrix:
-                    if (member.traits.numeric.matrix.column_count == member.traits.numeric.matrix.row_count)
+                    if (member_def.traits.numeric.matrix.column_count == member_def.traits.numeric.matrix.row_count)
                     {
-                        uint32_t dims{ member.traits.numeric.matrix.column_count };
+                        uint32_t dims{ member_def.traits.numeric.matrix.column_count };
                         switch (dims)
                         {
                         case 3: new_definition.param_type = Param_type::MAT3; break;
@@ -199,11 +206,19 @@ bool vk_pipeline::load_shader_module_spirv_reflect(const char* file_path)
                     break;
                 }
 
-                // @TODO: calculate memory offset and padded size.
+                // Retrieve memory offset and padded size.
+                auto& member_block{ struct_block.members[j] };
+                new_definition.calculated.param_block_offset = member_block.offset;
+                new_definition.calculated.param_size_padded = member_block.padded_size;
 
-                // @TODO: add new definition to list.
+                // Add new definition to list.
+                out_material_param_definitions.emplace_back(new_definition);
             }
-            std::cout << "SKIIIII" << std::endl;
+            
+            // Successfully found requisite material params struct.
+            out_material_param_block_size_padded = total_padded_size;
+            found = true;
+            break;
         }
     }
 
@@ -222,7 +237,7 @@ bool vk_pipeline::load_shader_module_spirv_reflect(const char* file_path)
     //    //builder.build()
     //}
 
-    return true;
+    return found;
 }
 
 void vk_pipeline::Graphics_pipeline_builder::clear()
