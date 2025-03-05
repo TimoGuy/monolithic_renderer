@@ -37,6 +37,12 @@ static std::mutex s_mat_set_name_to_idx_mutex;
 static std::vector<GPU_material_set> s_all_material_sets;
 static std::mutex s_all_material_sets_mutex;
 
+// Material push constant.
+struct GPU_material_push_constant
+{
+    VkDeviceAddress geo_instance_buffer;
+};
+
 }  // namespace material_bank
 
 
@@ -199,11 +205,19 @@ material_bank::GPU_pipeline material_bank::create_geometry_material_pipeline(
         descriptor_layouts[2] = s_material_agnostic_descriptor_layout;
     }
 
+    VkPushConstantRange pc_range{
+        .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+        .offset = 0,
+        .size = sizeof(GPU_material_push_constant),
+    };
+
     VkPipelineLayoutCreateInfo layout_info{
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
         .pNext = nullptr,
         .setLayoutCount = static_cast<uint32_t>(descriptor_layouts.size()),
         .pSetLayouts = descriptor_layouts.data(),
+        .pushConstantRangeCount = 1,
+        .pPushConstantRanges = &pc_range,
     };
     VkResult err{
         vkCreatePipelineLayout(device, &layout_info, nullptr, &new_pipeline.pipeline_layout) };
