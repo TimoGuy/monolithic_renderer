@@ -10,6 +10,12 @@
 namespace material_bank
 {
 
+// Descriptor layout references.
+static VkDescriptorSetLayout s_main_camera_descriptor_layout;
+static VkDescriptorSetLayout s_shadow_camera_descriptor_layout;
+static VkDescriptorSetLayout s_material_sets_indexing_descriptor_layout;
+static VkDescriptorSetLayout s_material_agnostic_descriptor_layout;
+
 // Pipeline containers.
 static std::unordered_map<std::string, uint32_t> s_pipe_name_to_idx;
 static std::mutex s_pipe_name_to_idx_mutex;
@@ -34,6 +40,19 @@ static std::mutex s_all_material_sets_mutex;
 }  // namespace material_bank
 
 
+// Passing references.
+void material_bank::set_descriptor_layout_references(
+    VkDescriptorSetLayout main_camera_descriptor_layout,
+    VkDescriptorSetLayout shadow_camera_descriptor_layout,
+    VkDescriptorSetLayout material_sets_indexing_descriptor_layout,
+    VkDescriptorSetLayout material_agnostic_descriptor_layout)
+{
+    s_main_camera_descriptor_layout = main_camera_descriptor_layout;
+    s_shadow_camera_descriptor_layout = shadow_camera_descriptor_layout;
+    s_material_sets_indexing_descriptor_layout = material_sets_indexing_descriptor_layout;
+    s_material_agnostic_descriptor_layout = material_agnostic_descriptor_layout;
+}
+
 // Pipeline.
 material_bank::GPU_pipeline material_bank::create_geometry_material_pipeline(
     VkDevice device,
@@ -49,78 +68,87 @@ material_bank::GPU_pipeline material_bank::create_geometry_material_pipeline(
     new_pipeline.camera_type = camera_type;
     new_pipeline.material_param_definitions = std::move(material_param_definitions);
 
-    // Verify material param definitions match and fill in calculated fields.
-    size_t reflected_material_param_block_size_padded;
-    std::vector<Material_parameter_definition> reflected_material_param_definitions;
-    vk_pipeline::load_shader_module_spirv_reflect_extract_material_params(
-        frag_shader_path,
-        reflected_material_param_block_size_padded,
-        reflected_material_param_definitions);
-
-    if (new_pipeline.material_param_definitions.size() !=
-        reflected_material_param_definitions.size())
+    if (use_material_params)
     {
-        std::cerr
-            << "ERROR: Number of material param definitions mismatched. Given: "
-            << new_pipeline.material_param_definitions.size()
-            << ". Reflected: "
-            << reflected_material_param_definitions.size()
-            << "."
-            << std::endl;
-        assert(false);
-    }
+        // Assert that since it declares using material params
+        // there must be material params attached.
+        assert(new_pipeline.material_param_definitions.size() > 0);
 
-    size_t num_definitions{ new_pipeline.material_param_definitions.size() };
-    size_t num_definitions_found{ 0 };
+        // Verify material param definitions match and fill in calculated fields.
+        size_t reflected_material_param_block_size_padded;
+        std::vector<Material_parameter_definition> reflected_material_param_definitions;
+        vk_pipeline::load_shader_module_spirv_reflect_extract_material_params(
+            frag_shader_path,
+            reflected_material_param_block_size_padded,
+            reflected_material_param_definitions);
 
-    for (auto& given_mat_param_def : new_pipeline.material_param_definitions)
-    for (auto& reflected_mat_param_def : reflected_material_param_definitions)
-    if (given_mat_param_def.param_name == reflected_mat_param_def.param_name)
-    {
-        if (given_mat_param_def.param_type == reflected_mat_param_def.param_type)
+        if (new_pipeline.material_param_definitions.size() !=
+            reflected_material_param_definitions.size())
         {
-            // One to one transfer of data.
-            given_mat_param_def.calculated =
-                reflected_mat_param_def.calculated;
-        }
-        else if (given_mat_param_def.param_type == Mat_param_def_type::TEXTURE_NAME &&
-            reflected_mat_param_def.param_type == Mat_param_def_type::UINT)
-        {
-            // Convert texture name to texture idx.
-            given_mat_param_def.calculated =
-                reflected_mat_param_def.calculated;
-
-            // @TODO: IMPLEMENT THIS!
-            // @TODO: Textures are not supported yet!
-            assert(false);
-        }
-        else
-        {
-            // Validation failed.
-            std::cerr << "ERROR: Reflected and given param types mismatched." << std::endl;
+            std::cerr
+                << "ERROR: Number of material param definitions mismatched. Given: "
+                << new_pipeline.material_param_definitions.size()
+                << ". Reflected: "
+                << reflected_material_param_definitions.size()
+                << "."
+                << std::endl;
             assert(false);
         }
 
-        // Move onto next given mat param.
-        num_definitions_found++;
-        break;
+        size_t num_definitions{ new_pipeline.material_param_definitions.size() };
+        size_t num_definitions_found{ 0 };
+
+        for (auto& given_mat_param_def : new_pipeline.material_param_definitions)
+        for (auto& reflected_mat_param_def : reflected_material_param_definitions)
+        if (given_mat_param_def.param_name == reflected_mat_param_def.param_name)
+        {
+            if (given_mat_param_def.param_type == reflected_mat_param_def.param_type)
+            {
+                // One to one transfer of data.
+                given_mat_param_def.calculated =
+                    reflected_mat_param_def.calculated;
+            }
+            else if (given_mat_param_def.param_type == Mat_param_def_type::TEXTURE_NAME &&
+                reflected_mat_param_def.param_type == Mat_param_def_type::UINT)
+            {
+                // Convert texture name to texture idx.
+                given_mat_param_def.calculated =
+                    reflected_mat_param_def.calculated;
+
+                // @TODO: IMPLEMENT THIS!
+                // @TODO: Textures are not supported yet!
+                assert(false);
+            }
+            else
+            {
+                // Validation failed.
+                std::cerr
+                    << "ERROR: Reflected and given param types mismatched: "
+                    << given_mat_param_def.param_name
+                    << std::endl;
+                assert(false);
+            }
+
+            // Move onto next given mat param.
+            num_definitions_found++;
+            break;
+        }
+
+        if (num_definitions_found != num_definitions)
+        {
+            std::cerr
+                << "ERROR: Number of material param definitions found is incorrect. Found: "
+                << num_definitions_found
+                << ". Expected: "
+                << num_definitions
+                << "."
+                << std::endl;
+            assert(false);
+        }
+
+        new_pipeline.calculated.material_param_block_size_padded =
+            reflected_material_param_block_size_padded;
     }
-
-    if (num_definitions_found != num_definitions)
-    {
-        std::cerr
-            << "ERROR: Number of material param definitions found is incorrect. Found: "
-            << num_definitions_found
-            << ". Expected: "
-            << num_definitions
-            << "."
-            << std::endl;
-        assert(false);
-    }
-
-    new_pipeline.calculated.material_param_block_size_padded =
-        reflected_material_param_block_size_padded;
-
 
     // @TODO: @FUTURE: Do some more shader verification?? E.g. check that there's
     //   no other descriptor sets or push constants over or under the required amounts.
@@ -146,10 +174,30 @@ material_bank::GPU_pipeline material_bank::create_geometry_material_pipeline(
 
     // Create pipeline layout.
     std::vector<VkDescriptorSetLayout> descriptor_layouts;
-    // for (auto& feature : features)  // @TODO
-    // {
-    //     decorate_feature(feature, descriptor_layouts);
-    // }
+    descriptor_layouts.resize(use_material_params ? 3 : 1);
+
+    switch (camera_type)
+    {
+    case Camera_type::MAIN_VIEW:
+        // @TODO: add main camera descriptor layout.
+        descriptor_layouts[0] = s_main_camera_descriptor_layout;
+        break;
+
+    case Camera_type::SHADOW_VIEW:
+        // @TODO: add shadow camera descriptor layout.
+        descriptor_layouts[0] = s_shadow_camera_descriptor_layout;
+        break;
+
+    default:
+        assert(false);
+        break;
+    }
+
+    if (use_material_params)
+    {
+        descriptor_layouts[1] = s_material_sets_indexing_descriptor_layout;
+        descriptor_layouts[2] = s_material_agnostic_descriptor_layout;
+    }
 
     VkPipelineLayoutCreateInfo layout_info{
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
@@ -172,7 +220,7 @@ material_bank::GPU_pipeline material_bank::create_geometry_material_pipeline(
     builder.set_vertex_input(gltf_loader::GPU_vertex::get_static_vertex_description());
     builder.set_input_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
     builder.set_polygon_mode(VK_POLYGON_MODE_FILL);
-    builder.set_cull_mode(VK_CULL_MODE_FRONT_BIT, VK_FRONT_FACE_CLOCKWISE);
+    builder.set_cull_mode(VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE);
     builder.set_multisampling_none();
     builder.disable_blending();
 

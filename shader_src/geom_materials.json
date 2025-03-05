@@ -1,7 +1,6 @@
 {
-    "pipelines": [
-        {
-            "name": "missing",
+    "pipelines": {
+        "missing": {
             "vert_shader": "geommat_missing.vert",
             "frag_shader": "geommat_missing.frag",
             "z_prepass_material": "opaque_z_prepass",
@@ -12,8 +11,7 @@
                 "color": "vec4"
             }
         },
-        {
-            "name": "opaque_z_prepass",
+        "opaque_z_prepass": {
             "vert_shader": "geommat_opaque_z_prepass.vert",
             "frag_shader": "geommat_opaque_z_prepass.frag",
             "z_prepass_material": null,
@@ -22,8 +20,7 @@
             "use_material_params": false,
             "material_params": {}
         },
-        {
-            "name": "opaque_shadow",
+        "opaque_shadow": {
             "vert_shader": "geommat_opaque_shadow.vert",
             "frag_shader": "geommat_opaque_shadow.frag",
             "z_prepass_material": null,
@@ -32,10 +29,9 @@
             "use_material_params": false,
             "material_params": {}
         }
-    ],
-    "materials": [
-        {
-            "name": "missing",
+    },
+    "materials": {
+        "missing": {
             "pipeline_name": "missing",
             "material_params": {
                 "color": {
@@ -46,5 +42,5 @@
                 }
             }
         }
-    ]
+    }
 }

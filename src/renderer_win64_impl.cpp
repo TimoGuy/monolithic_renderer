@@ -72,6 +72,12 @@ int32_t Monolithic_renderer::Impl::Load_assets_job::execute()
     TIMING_REPORT_START(reg_pipes);
     VkFormat draw_format{ m_pimpl.m_v_HDR_draw_image.image.image_format };
 
+    material_bank::set_descriptor_layout_references(
+        m_pimpl.m_v_geometry_graphics_pass.per_frame_datas.front().camera_data.descriptor_layout,
+        m_pimpl.m_v_geometry_graphics_pass.per_frame_datas.front().shadow_camera_data.descriptor_layout,
+        m_pimpl.m_v_geometry_graphics_pass.material_param_sets_data.descriptor_layout,
+        m_pimpl.m_v_geometry_graphics_pass.material_param_definition_descriptor_layout);
+
     material_bank::register_pipeline("missing");
     material_bank::register_pipeline("opaque_z_prepass");
     material_bank::register_pipeline("opaque_shadow");  // @TODO: IMPLEMENT SHADOWS

@@ -199,10 +199,14 @@ public:
         struct Per_frame_data
         {
             Descriptor_set_w_layout camera_data;
+            Descriptor_set_w_layout shadow_camera_data;  // @TODO: IMPLEMENT THIS!!!!!!
         };
         std::array<Per_frame_data, k_frame_overlap> per_frame_datas;
         Descriptor_set_w_layout material_param_sets_data;
         Descriptor_set_w_layout bounding_spheres_data;
+
+        std::vector<VkDescriptorSet> material_param_definition_descriptor_sets;  // @CHECK: Maybe this should be held by the material bank???
+        VkDescriptorSetLayout material_param_definition_descriptor_layout;
 
         VkPipeline culling_pipeline;
         VkPipelineLayout culling_pipeline_layout;

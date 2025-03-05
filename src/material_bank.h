@@ -26,20 +26,11 @@ enum class Mat_param_def_type
     UINT,
     FLOAT,
 
-    IVEC2,
-    IVEC3,
-    IVEC4,
-
-    UVEC2,
-    UVEC3,
-    UVEC4,
-
-    VEC2,
-    VEC3,
-    VEC4,
+    IVEC2, IVEC3, IVEC4,
+    UVEC2, UVEC3, UVEC4,
+     VEC2,  VEC3,  VEC4,
     
-    MAT3,
-    MAT4,
+    MAT3, MAT4,
 
     TEXTURE_NAME,  // @NOTE: Computes down to a uint32_t of the texture idx.
 
@@ -72,7 +63,7 @@ struct GPU_pipeline
     // @NOTE: Calculated in construction.
     struct Calculated
     {
-        size_t material_param_block_size_padded;
+        size_t material_param_block_size_padded{ 0 };
     } calculated;
 };
 
@@ -91,6 +82,13 @@ struct GPU_material_set
 {
     std::vector<uint32_t> material_indexes;
 };
+
+// Passing references.
+void set_descriptor_layout_references(
+    VkDescriptorSetLayout main_camera_descriptor_layout,
+    VkDescriptorSetLayout shadow_camera_descriptor_layout,
+    VkDescriptorSetLayout material_sets_indexing_descriptor_layout,
+    VkDescriptorSetLayout material_agnostic_descriptor_layout);
 
 // Pipeline.
 GPU_pipeline create_geometry_material_pipeline(

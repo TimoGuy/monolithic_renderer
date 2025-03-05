@@ -10,16 +10,16 @@ struct Material_param_definition
 {
     vec4 color;
 
-    // @TODO: remove below
-    ivec2 jojo;
-    uvec3 jojo2;
+    // // @TODO: remove below
+    // ivec2 jojo;
+    // uvec3 jojo2;
 
-    float koko;
-    int koko2;
-    uint koko3;
+    // float koko;
+    // int koko2;
+    // uint koko3;
 
-    mat3 lolo;
-    mat4 lolo2;
+    // mat3 lolo;
+    // mat4 lolo2;
 };
 
 // @TODO: PUT THIS INSIDE OF A HELPER THINGY.
