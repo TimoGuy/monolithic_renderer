@@ -57,11 +57,73 @@ material_bank::GPU_pipeline material_bank::create_geometry_material_pipeline(
         reflected_material_param_block_size_padded,
         reflected_material_param_definitions);
 
-    // @TODO: START HERE!!!!!
-    asdfasdfasdfasdf;
+    if (new_pipeline.material_param_definitions.size() !=
+        reflected_material_param_definitions.size())
+    {
+        std::cerr
+            << "ERROR: Number of material param definitions mismatched. Given: "
+            << new_pipeline.material_param_definitions.size()
+            << ". Reflected: "
+            << reflected_material_param_definitions.size()
+            << "."
+            << std::endl;
+        assert(false);
+    }
+
+    size_t num_definitions{ new_pipeline.material_param_definitions.size() };
+    size_t num_definitions_found{ 0 };
+
+    for (auto& given_mat_param_def : new_pipeline.material_param_definitions)
+    for (auto& reflected_mat_param_def : reflected_material_param_definitions)
+    if (given_mat_param_def.param_name == reflected_mat_param_def.param_name)
+    {
+        if (given_mat_param_def.param_type == reflected_mat_param_def.param_type)
+        {
+            // One to one transfer of data.
+            given_mat_param_def.calculated =
+                reflected_mat_param_def.calculated;
+        }
+        else if (given_mat_param_def.param_type == Mat_param_def_type::TEXTURE_NAME &&
+            reflected_mat_param_def.param_type == Mat_param_def_type::UINT)
+        {
+            // Convert texture name to texture idx.
+            given_mat_param_def.calculated =
+                reflected_mat_param_def.calculated;
+
+            // @TODO: IMPLEMENT THIS!
+            // @TODO: Textures are not supported yet!
+            assert(false);
+        }
+        else
+        {
+            // Validation failed.
+            std::cerr << "ERROR: Reflected and given param types mismatched." << std::endl;
+            assert(false);
+        }
+
+        // Move onto next given mat param.
+        num_definitions_found++;
+        break;
+    }
+
+    if (num_definitions_found != num_definitions)
+    {
+        std::cerr
+            << "ERROR: Number of material param definitions found is incorrect. Found: "
+            << num_definitions_found
+            << ". Expected: "
+            << num_definitions
+            << "."
+            << std::endl;
+        assert(false);
+    }
 
     new_pipeline.calculated.material_param_block_size_padded =
         reflected_material_param_block_size_padded;
+
+
+    // @TODO: @FUTURE: Do some more shader verification?? E.g. check that there's
+    //   no other descriptor sets or push constants over or under the required amounts.
 
     // Create shader pipeline.
     VkShaderModule vert_shader;

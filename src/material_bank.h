@@ -21,6 +21,7 @@ enum class Camera_type
 enum class Mat_param_def_type
 {
     UNSUPPORTED_TYPE = -1,
+
     INT = 0,
     UINT,
     FLOAT,
@@ -28,15 +29,19 @@ enum class Mat_param_def_type
     IVEC2,
     IVEC3,
     IVEC4,
+
     UVEC2,
     UVEC3,
     UVEC4,
+
     VEC2,
     VEC3,
     VEC4,
     
     MAT3,
     MAT4,
+
+    TEXTURE_NAME,  // @NOTE: Computes down to a uint32_t of the texture idx.
 
     NUM_TYPES
 };
