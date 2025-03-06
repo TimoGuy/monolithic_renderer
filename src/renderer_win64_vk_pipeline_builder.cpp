@@ -164,21 +164,27 @@ bool vk_pipeline::load_shader_module_spirv_reflect_extract_material_params(
                     {
                         bool is_signed{
                             member_def.traits.numeric.scalar.signedness == 1 };
+
+                        // Unsigned vectors unsupported.
+                        if (!is_signed)
+                        {
+                            std::cerr << "ERROR: Unsigned vectors unsupported." << std::endl;
+                            assert(false);
+                            return false;
+                        }
+
                         switch (member_def.traits.numeric.vector.component_count)
                         {
                         case 2:
-                            new_definition.param_type =
-                                (is_signed ? Param_type::IVEC2 : Param_type::UVEC2);
+                            new_definition.param_type = Param_type::IVEC2;
                             break;
 
                         case 3:
-                            new_definition.param_type =
-                                (is_signed ? Param_type::IVEC3 : Param_type::UVEC3);
+                            new_definition.param_type = Param_type::IVEC3;
                             break;
 
                         case 4:
-                            new_definition.param_type =
-                                (is_signed ? Param_type::IVEC4 : Param_type::UVEC4);
+                            new_definition.param_type = Param_type::IVEC4;
                             break;
                         }
                     }

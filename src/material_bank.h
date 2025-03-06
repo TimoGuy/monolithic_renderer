@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <vulkan/vulkan.h>
+#include "cglm/types.h"
 
 
 // @NOTE: A material is only for the geometry pipelines.
@@ -27,7 +28,6 @@ enum class Mat_param_def_type
     FLOAT,
 
     IVEC2, IVEC3, IVEC4,
-    UVEC2, UVEC3, UVEC4,
      VEC2,  VEC3,  VEC4,
     
     MAT3, MAT4,
@@ -48,6 +48,27 @@ struct Material_parameter_definition
         size_t param_block_offset;
         size_t param_size_padded;
     } calculated;
+};
+
+struct Material_parameter_data
+{
+    std::string param_name;
+
+    union Data
+    {
+        int32_t  _int;
+        uint32_t _uint;
+        float_t  _float;
+        ivec2    _ivec2;
+        ivec3    _ivec3;
+        ivec4    _ivec4;
+        vec2     _vec2;
+        vec3     _vec3;
+        vec4     _vec4;
+        mat3     _mat3;
+        mat4     _mat4;
+        uint32_t _texture_idx;
+    } data;
 };
 
 struct GPU_pipeline
@@ -72,7 +93,7 @@ constexpr uint32_t k_invalid_material_idx{ (uint32_t)-1 };
 struct GPU_material
 {
     uint32_t pipeline_idx;
-    // @TODO: add different material param things for adding into the gpu.
+    std::vector<Material_parameter_data> material_param_datas;
 
     // Local index within the group of materials using a pipeline.
     uint32_t cooked_material_param_local_idx;

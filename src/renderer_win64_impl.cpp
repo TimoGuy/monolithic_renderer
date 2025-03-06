@@ -84,7 +84,7 @@ int32_t Monolithic_renderer::Impl::Load_assets_job::execute()
     
     auto& v_device{ m_pimpl.m_v_device };
     material_bank::define_pipeline("missing",
-                                   "opaque_shadow",
+                                   "", // "opaque_shadow",  // @TODO: ADD SHADOWS.
                                    "opaque_z_prepass",
                                    material_bank::create_geometry_material_pipeline(
                                        v_device,
@@ -110,72 +110,148 @@ int32_t Monolithic_renderer::Impl::Load_assets_job::execute()
                                        "assets/shaders/geommat_opaque_z_prepass.vert.spv",
                                        "assets/shaders/geommat_opaque_z_prepass.frag.spv"));
     // @TODO: IMPLEMENT SHADOWS
-    material_bank::define_pipeline("opaque_shadow",
-                                   "",
-                                   "",
-                                   material_bank::create_geometry_material_pipeline(
-                                       v_device,
-                                       draw_format,
-                                       false,
-                                       material_bank::Camera_type::SHADOW_VIEW,
-                                       false,
-                                       {},
-                                       "assets/shaders/geommat_opaque_shadow.vert.spv",
-                                       "assets/shaders/geommat_opaque_shadow.frag.spv"));
+    // material_bank::define_pipeline("opaque_shadow",
+    //                                "",
+    //                                "",
+    //                                material_bank::create_geometry_material_pipeline(
+    //                                    v_device,
+    //                                    draw_format,
+    //                                    false,
+    //                                    material_bank::Camera_type::SHADOW_VIEW,
+    //                                    false,
+    //                                    {},
+    //                                    "assets/shaders/geommat_opaque_shadow.vert.spv",
+    //                                    "assets/shaders/geommat_opaque_shadow.frag.spv"));
     TIMING_REPORT_END_AND_PRINT(reg_pipes, "Register Material Pipelines: ");
 
     // Materials.
     TIMING_REPORT_START(reg_mats);
+    using Mat_data = material_bank::Material_parameter_data;
+    material_bank::register_material("Red", {
+        //.pipeline_idx = material_bank::get_pipeline_idx_from_name("pbr_default"),
+        .pipeline_idx = material_bank::get_pipeline_idx_from_name("missing"),
+        .material_param_datas{
+            Mat_data{ .param_name = "color", .data{ ._vec4{ 0.2f, 0.2f, 0.2f, 1.0f } }, },
+        },
+    });
     material_bank::register_material("Body", {
-        .pipeline_idx = material_bank::get_pipeline_idx_from_name("pbr_default"),
+        //.pipeline_idx = material_bank::get_pipeline_idx_from_name("pbr_default"),
+        .pipeline_idx = material_bank::get_pipeline_idx_from_name("missing"),
+        .material_param_datas{
+            Mat_data{ .param_name = "color", .data{ ._vec4{ 1.0f, 0.0f, 0.0f, 1.0f } }, },
+        },
     });
     material_bank::register_material("Tights", {
-        .pipeline_idx = material_bank::get_pipeline_idx_from_name("pbr_default"),
+        //.pipeline_idx = material_bank::get_pipeline_idx_from_name("pbr_default"),
+        .pipeline_idx = material_bank::get_pipeline_idx_from_name("missing"),
+        .material_param_datas{
+            Mat_data{ .param_name = "color", .data{ ._vec4{ 0.0f, 1.0f, 0.0f, 1.0f } }, },
+        },
     });
     material_bank::register_material("gold", {
-        .pipeline_idx = material_bank::get_pipeline_idx_from_name("pbr_default"),
+        //.pipeline_idx = material_bank::get_pipeline_idx_from_name("pbr_default"),
+        .pipeline_idx = material_bank::get_pipeline_idx_from_name("missing"),
+        .material_param_datas{
+            Mat_data{ .param_name = "color", .data{ ._vec4{ 0.0f, 0.0f, 1.0f, 1.0f } }, },
+        },
     });
     material_bank::register_material("slime_body", {
-        .pipeline_idx = material_bank::get_pipeline_idx_from_name("pbr_cel_shaded"),
+        //.pipeline_idx = material_bank::get_pipeline_idx_from_name("pbr_cel_shaded"),
+        .pipeline_idx = material_bank::get_pipeline_idx_from_name("missing"),
+        .material_param_datas{
+            Mat_data{ .param_name = "color", .data{ ._vec4{ 1.0f, 0.0f, 1.0f, 1.0f } }, },
+        },
     });
     material_bank::register_material("clothing_tights", {
-        .pipeline_idx = material_bank::get_pipeline_idx_from_name("pbr_default"),
+        //.pipeline_idx = material_bank::get_pipeline_idx_from_name("pbr_default"),
+        .pipeline_idx = material_bank::get_pipeline_idx_from_name("missing"),
+        .material_param_datas{
+            Mat_data{ .param_name = "color", .data{ ._vec4{ 0.0f, 1.0f, 1.0f, 1.0f } }, },
+        },
     });
     material_bank::register_material("slimegirl_eyebrows", {
-        .pipeline_idx = material_bank::get_pipeline_idx_from_name("pbr_default"),
+        //.pipeline_idx = material_bank::get_pipeline_idx_from_name("pbr_default"),
+        .pipeline_idx = material_bank::get_pipeline_idx_from_name("missing"),
+        .material_param_datas{
+            Mat_data{ .param_name = "color", .data{ ._vec4{ 1.0f, 1.0f, 1.0f, 1.0f } }, },
+        },
     });
     material_bank::register_material("slimegirl_eyes", {
-        .pipeline_idx = material_bank::get_pipeline_idx_from_name("pbr_default"),
+        //.pipeline_idx = material_bank::get_pipeline_idx_from_name("pbr_default"),
+        .pipeline_idx = material_bank::get_pipeline_idx_from_name("missing"),
+        .material_param_datas{
+            Mat_data{ .param_name = "color", .data{ ._vec4{ 0.0f, 0.0f, 0.0f, 1.0f } }, },
+        },
     });
     material_bank::register_material("slime_hair", {
-        .pipeline_idx = material_bank::get_pipeline_idx_from_name("pbr_cel_shaded"),
+        //.pipeline_idx = material_bank::get_pipeline_idx_from_name("pbr_cel_shaded"),
+        .pipeline_idx = material_bank::get_pipeline_idx_from_name("missing"),
+        .material_param_datas{
+            Mat_data{ .param_name = "color", .data{ ._vec4{ 0.5f, 0.0f, 0.0f, 1.0f } }, },
+        },
     });
     material_bank::register_material("suede_white", {
-        .pipeline_idx = material_bank::get_pipeline_idx_from_name("pbr_default"),
+        //.pipeline_idx = material_bank::get_pipeline_idx_from_name("pbr_default"),
+        .pipeline_idx = material_bank::get_pipeline_idx_from_name("missing"),
+        .material_param_datas{
+            Mat_data{ .param_name = "color", .data{ ._vec4{ 0.0f, 0.5f, 0.0f, 1.0f } }, },
+        },
     });
     material_bank::register_material("suede_gray", {
-        .pipeline_idx = material_bank::get_pipeline_idx_from_name("pbr_default"),
+        //.pipeline_idx = material_bank::get_pipeline_idx_from_name("pbr_default"),
+        .pipeline_idx = material_bank::get_pipeline_idx_from_name("missing"),
+        .material_param_datas{
+            Mat_data{ .param_name = "color", .data{ ._vec4{ 0.0f, 0.0f, 0.5f, 1.0f } }, },
+        },
     });
     material_bank::register_material("rubber_black", {
-        .pipeline_idx = material_bank::get_pipeline_idx_from_name("pbr_default"),
+        //.pipeline_idx = material_bank::get_pipeline_idx_from_name("pbr_default"),
+        .pipeline_idx = material_bank::get_pipeline_idx_from_name("missing"),
+        .material_param_datas{
+            Mat_data{ .param_name = "color", .data{ ._vec4{ 0.5f, 0.0f, 0.5f, 1.0f } }, },
+        },
     });
     material_bank::register_material("plastic_green", {
-        .pipeline_idx = material_bank::get_pipeline_idx_from_name("pbr_default"),
+        //.pipeline_idx = material_bank::get_pipeline_idx_from_name("pbr_default"),
+        .pipeline_idx = material_bank::get_pipeline_idx_from_name("missing"),
+        .material_param_datas{
+            Mat_data{ .param_name = "color", .data{ ._vec4{ 0.0f, 0.5f, 0.5f, 1.0f } }, },
+        },
     });
     material_bank::register_material("denim", {
-        .pipeline_idx = material_bank::get_pipeline_idx_from_name("pbr_default"),
+        //.pipeline_idx = material_bank::get_pipeline_idx_from_name("pbr_default"),
+        .pipeline_idx = material_bank::get_pipeline_idx_from_name("missing"),
+        .material_param_datas{
+            Mat_data{ .param_name = "color", .data{ ._vec4{ 0.5f, 0.5f, 0.5f, 1.0f } }, },
+        },
     });
     material_bank::register_material("leather", {
-        .pipeline_idx = material_bank::get_pipeline_idx_from_name("pbr_default"),
+        //.pipeline_idx = material_bank::get_pipeline_idx_from_name("pbr_default"),
+        .pipeline_idx = material_bank::get_pipeline_idx_from_name("missing"),
+        .material_param_datas{
+            Mat_data{ .param_name = "color", .data{ ._vec4{ 0.2f, 0.0f, 0.0f, 1.0f } }, },
+        },
     });
     material_bank::register_material("corduroy_white", {
-        .pipeline_idx = material_bank::get_pipeline_idx_from_name("pbr_default"),
+        //.pipeline_idx = material_bank::get_pipeline_idx_from_name("pbr_default"),
+        .pipeline_idx = material_bank::get_pipeline_idx_from_name("missing"),
+        .material_param_datas{
+            Mat_data{ .param_name = "color", .data{ ._vec4{ 0.0f, 0.2f, 0.0f, 1.0f } }, },
+        },
     });
     material_bank::register_material("ribbed_tan", {
-        .pipeline_idx = material_bank::get_pipeline_idx_from_name("pbr_default"),
+        //.pipeline_idx = material_bank::get_pipeline_idx_from_name("pbr_default"),
+        .pipeline_idx = material_bank::get_pipeline_idx_from_name("missing"),
+        .material_param_datas{
+            Mat_data{ .param_name = "color", .data{ ._vec4{ 0.0f, 0.0f, 0.2f, 1.0f } }, },
+        },
     });
     material_bank::register_material("knitting_green", {
-        .pipeline_idx = material_bank::get_pipeline_idx_from_name("pbr_default"),
+        //.pipeline_idx = material_bank::get_pipeline_idx_from_name("pbr_default"),
+        .pipeline_idx = material_bank::get_pipeline_idx_from_name("missing"),
+        .material_param_datas{
+            Mat_data{ .param_name = "color", .data{ ._vec4{ 0.2f, 0.0f, 0.2f, 1.0f } }, },
+        },
     });
     material_bank::cook_all_material_param_indices();
     TIMING_REPORT_END_AND_PRINT(reg_mats, "Register and Cook Materials: ");
@@ -931,6 +1007,12 @@ bool build_vulkan_renderer__geometry_graphics_pass(VkDevice device,
 
     // @NOTE: Defer write buffers to descriptor set until once they are created.
     //        `write_bounding_spheres_to_descriptor_sets()`
+
+    // Material param definition desc layout.
+    builder.clear();
+    builder.add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    out_geom_graphics_pass.material_param_definition_descriptor_layout =
+        builder.build(device, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     return true;
 }

@@ -303,6 +303,7 @@ uint32_t material_bank::get_pipeline_idx_from_name(const std::string& pipe_name)
     if (it == s_pipe_name_to_idx.end())
     {
         // Return invalid idx.
+        assert(false);
         return (uint32_t)-1;
     }
     return it->second;
@@ -363,6 +364,7 @@ uint32_t material_bank::get_mat_idx_from_name(const std::string& mat_name)
     if (it == s_mat_name_to_idx.end())
     {
         // Return invalid idx.
+        assert(false);
         return (uint32_t)-1;
     }
     return it->second;
@@ -406,6 +408,7 @@ uint32_t material_bank::get_mat_set_idx_from_name(const std::string& mat_set_nam
     if (it == s_mat_set_name_to_idx.end())
     {
         // Return invalid idx.
+        assert(false);
         return (uint32_t)-1;
     }
     return it->second;
