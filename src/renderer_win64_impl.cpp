@@ -72,11 +72,12 @@ int32_t Monolithic_renderer::Impl::Load_assets_job::execute()
     TIMING_REPORT_START(reg_pipes);
     VkFormat draw_format{ m_pimpl.m_v_HDR_draw_image.image.image_format };
 
-    material_bank::set_descriptor_layout_references(
+    material_bank::set_descriptor_references(
         m_pimpl.m_v_geometry_graphics_pass.per_frame_datas.front().camera_data.descriptor_layout,
         m_pimpl.m_v_geometry_graphics_pass.per_frame_datas.front().shadow_camera_data.descriptor_layout,
         m_pimpl.m_v_geometry_graphics_pass.material_param_sets_data.descriptor_layout,
-        m_pimpl.m_v_geometry_graphics_pass.material_param_definition_descriptor_layout);
+        m_pimpl.m_v_geometry_graphics_pass.material_param_definition_descriptor_layout,
+        m_pimpl.m_v_geometry_graphics_pass.material_param_sets_data.descriptor_set);
 
     material_bank::register_pipeline("missing");
     material_bank::register_pipeline("opaque_z_prepass");
@@ -84,8 +85,8 @@ int32_t Monolithic_renderer::Impl::Load_assets_job::execute()
     
     auto& v_device{ m_pimpl.m_v_device };
     material_bank::define_pipeline("missing",
-                                   "", // "opaque_shadow",  // @TODO: ADD SHADOWS.
                                    "opaque_z_prepass",
+                                   "", // "opaque_shadow",  // @TODO: ADD SHADOWS.
                                    material_bank::create_geometry_material_pipeline(
                                        v_device,
                                        draw_format,
@@ -926,6 +927,31 @@ bool build_vulkan_renderer__descriptors(VkDevice device,
     return true;
 }
 
+struct GPU_geometry_culling_push_constants
+{
+    float_t         z_near;
+    float_t         z_far;
+    float_t         frustum_x_x;
+    float_t         frustum_x_z;
+    float_t         frustum_y_y;
+    float_t         frustum_y_z;
+    uint32_t        culling_enabled;
+    uint32_t        num_instances;
+    VkDeviceAddress instance_buffer_address;
+    VkDeviceAddress visible_result_buffer_address;
+};
+
+struct GPU_write_draw_cmds_push_constants
+{
+    uint32_t        num_primitives;
+    VkDeviceAddress visible_result_buffer_address;
+    VkDeviceAddress base_indices_buffer_address;
+    VkDeviceAddress count_buffer_indices_buffer_address;
+    VkDeviceAddress draw_commands_input_buffer_address;
+    VkDeviceAddress draw_commands_output_buffer_address;
+    VkDeviceAddress draw_command_counts_buffer_address;
+};
+
 using Geometry_graphics_pass = Monolithic_renderer::Impl::Geometry_graphics_pass;
 bool build_vulkan_renderer__geometry_graphics_pass(VkDevice device,
                                                    VmaAllocator allocator,
@@ -1013,6 +1039,129 @@ bool build_vulkan_renderer__geometry_graphics_pass(VkDevice device,
     builder.add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     out_geom_graphics_pass.material_param_definition_descriptor_layout =
         builder.build(device, VK_SHADER_STAGE_FRAGMENT_BIT);
+
+    {
+        // Build culling pipeline layout.
+        VkPushConstantRange pc_range{
+            .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+            .offset = 0,
+            .size = sizeof(GPU_geometry_culling_push_constants),
+        };
+
+        VkDescriptorSetLayout desc_layouts[]{
+            out_geom_graphics_pass.per_frame_datas.front().camera_data.descriptor_layout,
+            out_geom_graphics_pass.bounding_spheres_data.descriptor_layout,
+        };
+
+        VkPipelineLayoutCreateInfo layout_info{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+            .pNext = nullptr,
+            .setLayoutCount = 2,
+            .pSetLayouts = desc_layouts,
+            .pushConstantRangeCount = 1,
+            .pPushConstantRanges = &pc_range,
+        };
+        VkResult err{
+            vkCreatePipelineLayout(device,
+                                   &layout_info,
+                                   nullptr,
+                                   &out_geom_graphics_pass.culling_pipeline_layout) };
+        if (err)
+        {
+            std::cerr << "ERROR: Pipeline layout creation failed." << std::endl;
+            assert(false);
+        }
+
+        // Build culling pipeline.
+        VkShaderModule compute_draw_shader;
+        if (!vk_pipeline::load_shader_module(("assets/shaders/geom_culling.comp.spv"),
+                                             device,
+                                             compute_draw_shader))
+        {
+            std::cerr << "ERROR: Shader module loading failed." << std::endl;
+            assert(false);
+        }
+
+        VkComputePipelineCreateInfo pipeline_info{
+            .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+            .pNext = nullptr,
+            .stage = vk_util::pipeline_shader_stage_info(VK_SHADER_STAGE_COMPUTE_BIT,
+                                                         compute_draw_shader),
+            .layout = out_geom_graphics_pass.culling_pipeline_layout,
+        };
+
+        err = vkCreateComputePipelines(device,
+                                       VK_NULL_HANDLE,
+                                       1, &pipeline_info,
+                                       nullptr,
+                                       &out_geom_graphics_pass.culling_pipeline);
+        if (err)
+        {
+            std::cerr << "ERROR: Create compute pipeline failed." << std::endl;
+        }
+
+        // Clean up shader modules.
+        vkDestroyShaderModule(device, compute_draw_shader, nullptr);
+    }
+
+    {
+        // Build write draw cmds pipeline layout.
+        VkPushConstantRange pc_range{
+            .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+            .offset = 0,
+            .size = sizeof(GPU_write_draw_cmds_push_constants),
+        };
+
+        VkPipelineLayoutCreateInfo layout_info{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+            .pNext = nullptr,
+            .setLayoutCount = 0,
+            .pSetLayouts = nullptr,
+            .pushConstantRangeCount = 1,
+            .pPushConstantRanges = &pc_range,
+        };
+        VkResult err{
+            vkCreatePipelineLayout(device,
+                                   &layout_info,
+                                   nullptr,
+                                   &out_geom_graphics_pass.write_draw_cmds_pipeline_layout) };
+        if (err)
+        {
+            std::cerr << "ERROR: Pipeline layout creation failed." << std::endl;
+            assert(false);
+        }
+
+        // Build write draw cmds pipeline.
+        VkShaderModule compute_draw_shader;
+        if (!vk_pipeline::load_shader_module(("assets/shaders/geom_write_draw_cmds.comp.spv"),
+                                             device,
+                                             compute_draw_shader))
+        {
+            std::cerr << "ERROR: Shader module loading failed." << std::endl;
+            assert(false);
+        }
+
+        VkComputePipelineCreateInfo pipeline_info{
+            .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+            .pNext = nullptr,
+            .stage = vk_util::pipeline_shader_stage_info(VK_SHADER_STAGE_COMPUTE_BIT,
+                                                         compute_draw_shader),
+            .layout = out_geom_graphics_pass.write_draw_cmds_pipeline_layout,
+        };
+
+        err = vkCreateComputePipelines(device,
+                                       VK_NULL_HANDLE,
+                                       1, &pipeline_info,
+                                       nullptr,
+                                       &out_geom_graphics_pass.write_draw_cmds_pipeline);
+        if (err)
+        {
+            std::cerr << "ERROR: Create compute pipeline failed." << std::endl;
+        }
+
+        // Clean up shader modules.
+        vkDestroyShaderModule(device, compute_draw_shader, nullptr);
+    }
 
     return true;
 }
@@ -1610,20 +1759,6 @@ void render__run_sunlight_shadow_cascades_pass()
 {
 }
 
-struct GPU_geometry_culling_push_constants
-{
-    float_t  z_near;
-    float_t  z_far;
-    float_t  frustum_x_x;
-    float_t  frustum_x_z;
-    float_t  frustum_y_y;
-    float_t  frustum_y_z;
-    uint32_t culling_enabled;
-    uint32_t num_instances;
-    VkDeviceAddress instance_buffer_address;
-    VkDeviceAddress visible_result_buffer_address;
-};
-
 void render__run_camera_view_geometry_culling(VkCommandBuffer cmd,
                                               VkDescriptorSet camera_desc_set,
                                               VkDescriptorSet bounding_sphere_desc_set,
@@ -1634,6 +1769,8 @@ void render__run_camera_view_geometry_culling(VkCommandBuffer cmd,
                                               VkDeviceSize visible_result_data_buffer_size,
                                               uint32_t graphics_queue_family_idx)
 {
+    assert(params.num_instances > 0);  // @TODO: Add in just clearing and no drawing if nothing to render.
+
     // @NOTE: Visibility is calculated at a per-instance level here.
     vkCmdBindPipeline(cmd,
                       VK_PIPELINE_BIND_POINT_COMPUTE,
@@ -1681,18 +1818,6 @@ void render__run_camera_view_geometry_culling(VkCommandBuffer cmd,
                          0, nullptr);
 }
 
-struct GPU_write_draw_cmds_push_constants
-{
-    uint32_t num_primitives;
-    VkDeviceAddress instance_buffer_address;
-    VkDeviceAddress visible_result_buffer;
-    VkDeviceAddress base_indices;
-    VkDeviceAddress count_buffer_indices;
-    VkDeviceAddress draw_commands_input;
-    VkDeviceAddress draw_commands_output;
-    VkDeviceAddress draw_command_counts;
-};
-
 void render__run_write_camera_view_geometry_draw_cmds(
     VkCommandBuffer cmd,
     const GPU_write_draw_cmds_push_constants& params,
@@ -1706,6 +1831,8 @@ void render__run_write_camera_view_geometry_draw_cmds(
     // @TODO: Figure out if you wanna move the write draw cmds step to
     //        its own thing so that the resulting buffer can be reused
     //        for other rendering steps.
+
+    assert(num_primitive_render_groups > 0);  // @TODO: Add in just clearing and no drawing if nothing to render.
 
     // Reset count buffer to 0.
     vkCmdFillBuffer(cmd,
@@ -1750,9 +1877,8 @@ void render__run_write_camera_view_geometry_draw_cmds(
             .buffer = indirect_draw_cmd_counts_buffer,
             .offset = 0,
             .size = sizeof(uint32_t) * num_primitive_render_groups,
-            // @CONTINUE: Bc the above needs to be grouped per pipeline, like the bucketing.
-            //   and there needs to be a way to reference the correct bucket to access.
-            //   Ig, there is the method of just having push constants and dispatch a compute shader for every pipeline.
+            // @NOTE: ^^ Instead of instances or primitives, these are primitive render
+            //   groups, grouped by shader idx.
         }
     };
     vkCmdPipelineBarrier(cmd,
@@ -1762,16 +1888,13 @@ void render__run_write_camera_view_geometry_draw_cmds(
                          0, nullptr,
                          2, buffer_barriers,
                          0, nullptr);
-
-    // @TODO: @FIXME: There's an issue where the draw counts are not actually instance-wide, but rather
-    //   material's pipelines-wide. So, though there will be organization there, effort needs to be taken
-    //   to make sure that the sizing and stuff like that is correct.
-    assert(false);
 }
 
 void render__run_opaque_geometry_pass(VkCommandBuffer cmd,
                                       VkImageView image_view,
                                       VkExtent2D draw_extent,
+                                      VkDescriptorSet main_view_camera_descriptor_set,
+                                      VkDeviceAddress instance_data_buffer_address,
                                       VkBuffer indirect_draw_buffer,
                                       VkBuffer indirect_draw_count_buffer)
 {
@@ -1804,7 +1927,7 @@ void render__run_opaque_geometry_pass(VkCommandBuffer cmd,
 
     // Set initial values.
     gltf_loader::bind_combined_mesh(cmd);
-    VkPipeline prev_pipeline{ nullptr };
+    uint32_t prev_pipeline_cidx{ (uint32_t)-1 };
 
     // Draw all opaque primitives.
     enum : uint8_t {
@@ -1816,36 +1939,24 @@ void render__run_opaque_geometry_pass(VkCommandBuffer cmd,
     {
         // Z prepass and then Material-based draw.
         VkDeviceSize drawn_primitive_count{ 0 };
-        VkDeviceSize render_{ 0 };
+        VkDeviceSize render_primitive_group_idx{ 0 };
         for (auto& it : grouped_primitives)
         {
             auto pipeline_idx{ it.first };
             auto& primitive_ptr_list{ it.second };
 
-            VkPipeline pipeline;
-            VkPipelineLayout pipeline_layout;
-            std::vector<VkDescriptorSet> desc_sets;
+            const material_bank::GPU_pipeline* pipeline{ nullptr };
             switch (pass)
             {
             case DRAW_Z_PREPASS:
-                assert(false);
                 pipeline =
-                    material_bank::get_pipeline(it.first)
-                        .z_prepass_pipeline
-                        ->pipeline;
-                pipeline_layout =
-                    material_bank::get_pipeline(it.first)
-                        .z_prepass_pipeline
-                        ->pipeline_layout;
-                // desc_sets.emplace_back(nullptr);
+                    material_bank::get_pipeline(pipeline_idx)
+                        .z_prepass_pipeline;
                 break;
 
             case DRAW_MATERIAL_BASED_PASS:
                 pipeline =
-                    material_bank::get_pipeline(it.first).pipeline;
-                pipeline_layout =
-                    material_bank::get_pipeline(it.first).pipeline_layout;
-                // desc_sets.emplace_back(nullptr);
+                    &material_bank::get_pipeline(pipeline_idx);
                 break;
 
             default:
@@ -1853,35 +1964,32 @@ void render__run_opaque_geometry_pass(VkCommandBuffer cmd,
                 break;
             }
 
-            if (pipeline != prev_pipeline)
+            // Skip drawing if no pipeline was selected
+            // (could be ignored z prepass texture or something).
+            assert(pipeline != nullptr);
+
+            // Bind material pipeline.
+            if (pipeline->calculated.pipeline_creation_idx != prev_pipeline_cidx)
             {
-                vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-                vkCmdSetViewport(cmd, 0, 1, &viewport);
-                vkCmdSetScissor(cmd, 0, 1, &scissor);
-    
-                for (uint32_t i = 0; i < static_cast<uint32_t>(desc_sets.size()); i++)
-                {
-                    auto& desc_set{ desc_sets[i] };
-                    vkCmdBindDescriptorSets(cmd,
-                                            VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                            pipeline_layout,
-                                            i,
-                                            1, &desc_set,
-                                            0, nullptr);
-                }
-    
-                prev_pipeline = pipeline;
+                pipeline->bind_pipeline(cmd,
+                                        viewport,
+                                        scissor,
+                                        &main_view_camera_descriptor_set,
+                                        nullptr,
+                                        instance_data_buffer_address);
+                prev_pipeline_cidx = pipeline->calculated.pipeline_creation_idx;
             }
-    
+
+            // 描け～！！
             vkCmdDrawIndexedIndirectCount(cmd,
                                           indirect_draw_buffer,
                                           drawn_primitive_count,
                                           indirect_draw_count_buffer,
-                                          render_,
+                                          render_primitive_group_idx,
                                           static_cast<uint32_t>(primitive_ptr_list.size()),
                                           sizeof(VkDrawIndexedIndirectCommand));
             drawn_primitive_count += primitive_ptr_list.size();
-            render_++;
+            render_primitive_group_idx++;
         }
     }
 
@@ -2120,22 +2228,42 @@ bool Monolithic_renderer::Impl::render()
 
         auto& current_per_frame_data{ get_current_geom_per_frame_data() };
 
+        constexpr bool k_culling_enabled{ true };
+
+        const auto& current_geo_frame{ current_frame.geo_per_frame_buffer };
+
         GPU_geometry_culling_push_constants geom_culling_pc{
-            // @TODO: implement!
+            .z_near = 0.0f,  // @TODO: Calculate frustum!
+            .z_far = 0.0f,
+            .frustum_x_x = 0.0f,
+            .frustum_x_z = 0.0f,
+            .frustum_y_y = 0.0f,
+            .frustum_y_z = 0.0f,
+            .culling_enabled = (k_culling_enabled ? 1 : 0),
+            .num_instances = geo_instance::get_unique_instances_count(),
+            .instance_buffer_address = current_geo_frame.instance_data_buffer_address,
+            .visible_result_buffer_address = current_geo_frame.visible_result_buffer_address,
         };
 
         render__run_camera_view_geometry_culling(cmd,
-                                                 current_per_frame_data.camera_data.descriptor_set,
-                                                 m_v_geometry_graphics_pass.bounding_spheres_data.descriptor_set,
-                                                 geom_culling_pc,
-                                                 m_v_geometry_graphics_pass.culling_pipeline,
-                                                 m_v_geometry_graphics_pass.culling_pipeline_layout,
-                                                 current_frame.geo_per_frame_buffer.visible_result_buffer.buffer,
-                                                 sizeof(uint32_t) * current_frame.geo_per_frame_buffer.num_visible_result_elems,
-                                                 m_v_graphics_queue_family_idx);
+            current_per_frame_data.camera_data.descriptor_set,
+            m_v_geometry_graphics_pass.bounding_spheres_data.descriptor_set,
+            geom_culling_pc,
+            m_v_geometry_graphics_pass.culling_pipeline,
+            m_v_geometry_graphics_pass.culling_pipeline_layout,
+            current_geo_frame.visible_result_buffer.buffer,
+            sizeof(uint32_t) * current_geo_frame.num_visible_result_elems,
+            m_v_graphics_queue_family_idx);
 
         GPU_write_draw_cmds_push_constants write_draw_cmds_pc{
-            // @TODO: implement!
+            .num_primitives =  // @TODO: @CHECK: I wonder if this should be for all primitives instead of just opaque ones.
+                geo_instance::get_number_primitives(geo_instance::Geo_render_pass::OPAQUE),
+            .visible_result_buffer_address = current_geo_frame.visible_result_buffer_address,
+            .base_indices_buffer_address = current_geo_frame.primitive_group_base_index_buffer_address,
+            .count_buffer_indices_buffer_address = current_geo_frame.count_buffer_index_buffer_address,
+            .draw_commands_input_buffer_address = current_geo_frame.indirect_command_buffer_address,
+            .draw_commands_output_buffer_address = current_geo_frame.culled_indirect_command_buffer_address,
+            .draw_command_counts_buffer_address = current_geo_frame.indirect_counts_buffer_address,
         };
 
         render__run_write_camera_view_geometry_draw_cmds(cmd,
@@ -2144,14 +2272,16 @@ bool Monolithic_renderer::Impl::render()
                                                             geo_instance::Geo_render_pass::OPAQUE),
                                                          m_v_geometry_graphics_pass.write_draw_cmds_pipeline,
                                                          m_v_geometry_graphics_pass.write_draw_cmds_pipeline_layout,
-                                                         current_frame.geo_per_frame_buffer.culled_indirect_command_buffer.buffer,
-                                                         current_frame.geo_per_frame_buffer.indirect_counts_buffer.buffer,
+                                                         current_geo_frame.culled_indirect_command_buffer.buffer,
+                                                         current_geo_frame.indirect_counts_buffer.buffer,
                                                          m_v_graphics_queue_family_idx);
         render__run_opaque_geometry_pass(cmd,
                                          m_v_HDR_draw_image.image.image_view,
                                          m_v_HDR_draw_image.extent,
-                                         current_frame.geo_per_frame_buffer.culled_indirect_command_buffer.buffer,
-                                         current_frame.geo_per_frame_buffer.indirect_counts_buffer.buffer);
+                                         current_per_frame_data.camera_data.descriptor_set,
+                                         current_geo_frame.instance_data_buffer_address,
+                                         current_geo_frame.culled_indirect_command_buffer.buffer,
+                                         current_geo_frame.indirect_counts_buffer.buffer);
 
         render__run_sample_geometry_pass(cmd,
                                          m_v_HDR_draw_image.image.image_view,

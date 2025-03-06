@@ -16,6 +16,9 @@ static VkDescriptorSetLayout s_shadow_camera_descriptor_layout;
 static VkDescriptorSetLayout s_material_sets_indexing_descriptor_layout;
 static VkDescriptorSetLayout s_material_agnostic_descriptor_layout;
 
+// Descriptor set references.
+static VkDescriptorSet s_material_sets_indexing_descriptor_set;
+
 // Pipeline containers.
 static std::unordered_map<std::string, uint32_t> s_pipe_name_to_idx;
 static std::mutex s_pipe_name_to_idx_mutex;
@@ -46,17 +49,82 @@ struct GPU_material_push_constant
 }  // namespace material_bank
 
 
+// GPU_pipeline.
+void material_bank::GPU_pipeline::bind_pipeline(
+    VkCommandBuffer cmd,
+    const VkViewport& viewport,
+    const VkRect2D& scissor,
+    const VkDescriptorSet* main_view_camera_descriptor_set,
+    const VkDescriptorSet* shadow_view_camera_descriptor_set,
+    VkDeviceAddress instance_data_buffer_address) const
+{
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+    vkCmdSetViewport(cmd, 0, 1, &viewport);
+    vkCmdSetScissor(cmd, 0, 1, &scissor);
+
+    bool use_material_params{ !material_param_definitions.empty() };
+    std::vector<VkDescriptorSet> desc_sets;
+    desc_sets.resize(use_material_params ? 3 : 1);
+
+    // Bind camera descriptor set.
+    switch (camera_type)
+    {
+    case Camera_type::MAIN_VIEW:
+        assert(main_view_camera_descriptor_set != nullptr);
+        desc_sets[0] = *main_view_camera_descriptor_set;
+        break;
+
+    case Camera_type::SHADOW_VIEW:
+        assert(shadow_view_camera_descriptor_set != nullptr);
+        desc_sets[0] = *shadow_view_camera_descriptor_set;
+        assert(false);  // @TODO: Not implemented yet!
+        break;
+
+    default:
+        assert(false);
+        break;
+    }
+
+    // Bind global material set and material param descriptor set (optional).
+    if (use_material_params)
+    {
+        desc_sets[1] = s_material_sets_indexing_descriptor_set;
+        desc_sets[2] = combined_all_material_datas_descriptor_set;
+        assert(false);  // @TODO: @CHECK: This isn't setup yet!
+    }
+
+    // Bind descriptor sets.
+    vkCmdBindDescriptorSets(cmd,
+                            VK_PIPELINE_BIND_POINT_GRAPHICS,
+                            pipeline_layout,
+                            0,
+                            static_cast<uint32_t>(desc_sets.size()), desc_sets.data(),
+                            0, nullptr);
+
+    // Push instance buffer reference.
+    GPU_material_push_constant mat_pc{
+        .geo_instance_buffer = instance_data_buffer_address,
+    };
+    vkCmdPushConstants(cmd,
+                       pipeline_layout,
+                       VK_SHADER_STAGE_VERTEX_BIT,
+                       0, sizeof(GPU_material_push_constant),
+                       &mat_pc);
+}
+
 // Passing references.
-void material_bank::set_descriptor_layout_references(
+void material_bank::set_descriptor_references(
     VkDescriptorSetLayout main_camera_descriptor_layout,
     VkDescriptorSetLayout shadow_camera_descriptor_layout,
     VkDescriptorSetLayout material_sets_indexing_descriptor_layout,
-    VkDescriptorSetLayout material_agnostic_descriptor_layout)
+    VkDescriptorSetLayout material_agnostic_descriptor_layout,
+    VkDescriptorSet material_sets_indexing_descriptor_set)
 {
     s_main_camera_descriptor_layout = main_camera_descriptor_layout;
     s_shadow_camera_descriptor_layout = shadow_camera_descriptor_layout;
     s_material_sets_indexing_descriptor_layout = material_sets_indexing_descriptor_layout;
     s_material_agnostic_descriptor_layout = material_agnostic_descriptor_layout;
+    s_material_sets_indexing_descriptor_set = material_sets_indexing_descriptor_set;
 }
 
 // Pipeline.
@@ -185,13 +253,13 @@ material_bank::GPU_pipeline material_bank::create_geometry_material_pipeline(
     switch (camera_type)
     {
     case Camera_type::MAIN_VIEW:
-        // @TODO: add main camera descriptor layout.
         descriptor_layouts[0] = s_main_camera_descriptor_layout;
         break;
 
     case Camera_type::SHADOW_VIEW:
         // @TODO: add shadow camera descriptor layout.
         descriptor_layouts[0] = s_shadow_camera_descriptor_layout;
+        assert(false);
         break;
 
     default:
@@ -250,6 +318,10 @@ material_bank::GPU_pipeline material_bank::create_geometry_material_pipeline(
     // Clean up shader modules.
     vkDestroyShaderModule(device, vert_shader, nullptr);
     vkDestroyShaderModule(device, frag_shader, nullptr);
+
+    // Assign creation idx.
+    static std::atomic_uint32_t s_current_creation_idx{ 0 };
+    new_pipeline.calculated.pipeline_creation_idx = s_current_creation_idx++;
 
     return new_pipeline;
 }

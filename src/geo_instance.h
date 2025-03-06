@@ -52,6 +52,8 @@ void rebuild_bucketed_instance_list_array(std::vector<vk_buffer::GPU_geo_per_fra
 
 std::vector<Geo_instance*> get_all_unique_instances();
 
+uint32_t get_unique_instances_count();
+
 using Primitive_ptr_list_t = std::vector<Instance_primitive*>;
 Primitive_ptr_list_t get_all_primitives();
 

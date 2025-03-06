@@ -67,7 +67,7 @@ void geo_instance::unregister_geo_instance(Geo_instance_key_t key)
 
 void geo_instance::rebuild_bucketed_instance_list_array(std::vector<vk_buffer::GPU_geo_per_frame_buffer*>& all_per_frame_buffers)
 {
-    if (s_flag_rebucketing)
+    if (!s_flag_rebucketing)
         return;
 #if _DEBUG
     s_currently_rebucketing = true;
@@ -143,6 +143,16 @@ std::vector<geo_instance::Geo_instance*> geo_instance::get_all_unique_instances(
     ////////////////////////////////////////////////////////////
 
     return instances;
+}
+
+uint32_t geo_instance::get_unique_instances_count()
+{
+    // @INCOMPLETE: THIS ISN't THE FINAL IMPLEMENTATION AFAIK //
+    Geo_instance_key_t inst_count{ s_current_register_idx };
+    assert(inst_count <= k_num_instances);
+    ////////////////////////////////////////////////////////////
+
+    return static_cast<uint32_t>(inst_count);
 }
 
 geo_instance::Primitive_ptr_list_t geo_instance::get_all_primitives()

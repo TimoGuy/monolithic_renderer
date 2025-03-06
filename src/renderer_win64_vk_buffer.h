@@ -47,7 +47,6 @@ struct GPU_mesh_buffer
 {
     Allocated_buffer index_buffer;
     Allocated_buffer vertex_buffer;
-    VkDeviceAddress  vertex_buffer_address;
 };
 
 GPU_mesh_buffer upload_mesh_to_gpu(const vk_util::Immediate_submit_support& support,

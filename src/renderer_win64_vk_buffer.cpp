@@ -120,26 +120,18 @@ vk_buffer::GPU_mesh_buffer vk_buffer::upload_mesh_to_gpu(const vk_util::Immediat
         .index_buffer{
             create_buffer(allocator,
                           index_buffer_size,
-                          VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+                          VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
                               VK_BUFFER_USAGE_TRANSFER_DST_BIT,
                           VMA_MEMORY_USAGE_GPU_ONLY)
         },
         .vertex_buffer{
             create_buffer(allocator,
                           vertex_buffer_size,
-                          VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
-                              VK_BUFFER_USAGE_TRANSFER_DST_BIT |
-                              VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+                          VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
+                              VK_BUFFER_USAGE_TRANSFER_DST_BIT,
                           VMA_MEMORY_USAGE_GPU_ONLY)
         },
     };
-
-    VkBufferDeviceAddressInfo device_address_info{
-        .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
-        .pNext = nullptr,
-        .buffer = new_mesh.vertex_buffer.buffer,
-    };
-    new_mesh.vertex_buffer_address = vkGetBufferDeviceAddress(device, &device_address_info);
 
     // Upload data.
     Allocated_buffer staging_buffer{
@@ -494,6 +486,7 @@ void vk_buffer::upload_changed_per_frame_data(const vk_util::Immediate_submit_su
     }
 
     // Update instance data buffer sizing.
+    frame_buffer.num_instance_data_elems = unique_instances.size();
     if (unique_instances.size() > frame_buffer.num_instance_data_elem_capacity)
     {
         size_t new_capacity{
@@ -534,6 +527,7 @@ void vk_buffer::upload_changed_per_frame_data(const vk_util::Immediate_submit_su
     }
 
     // Update visible result buffer sizing.
+    frame_buffer.num_visible_result_elems = unique_instances.size();
     if (unique_instances.size() > frame_buffer.num_visible_result_elem_capacity)
     {
         size_t new_capacity{
@@ -596,6 +590,11 @@ void vk_buffer::upload_changed_per_frame_data(const vk_util::Immediate_submit_su
     // Update primitive group base indices buffer
     // and count buffer indices buffer sizing.
     assert(primitive_group_base_indices.size() == count_buffer_indices.size());
+
+    frame_buffer.num_primitive_group_base_index_elems =
+        primitive_group_base_indices.size();
+    frame_buffer.num_count_buffer_index_elems = count_buffer_indices.size();
+
     if (primitive_group_base_indices.size() >
         frame_buffer.num_primitive_group_base_index_elem_capacity)
     {
@@ -662,6 +661,7 @@ void vk_buffer::upload_changed_per_frame_data(const vk_util::Immediate_submit_su
     }
 
     // Update indirect cmd buffer sizing.
+    frame_buffer.num_indirect_cmd_elems = all_primitives.size();
     if (all_primitives.size() > frame_buffer.num_indirect_cmd_elem_capacity)
     {
         size_t new_capacity{
@@ -730,6 +730,7 @@ void vk_buffer::upload_changed_per_frame_data(const vk_util::Immediate_submit_su
         static_cast<uint32_t>(all_base_primitive_groups.size()) };
 
     // Update indirect counts sizing.
+    frame_buffer.num_indirect_counts_elems = num_primitive_groups;
     if (num_primitive_groups > frame_buffer.num_indirect_counts_elem_capacity)
     {
         size_t new_capacity{

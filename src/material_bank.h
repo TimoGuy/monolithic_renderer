@@ -80,12 +80,21 @@ struct GPU_pipeline
 
     Camera_type camera_type;
     std::vector<Material_parameter_definition> material_param_definitions;
+    VkDescriptorSet combined_all_material_datas_descriptor_set;
 
     // @NOTE: Calculated in construction.
     struct Calculated
     {
+        uint32_t pipeline_creation_idx;
         size_t material_param_block_size_padded{ 0 };
     } calculated;
+
+    void bind_pipeline(VkCommandBuffer cmd,
+                       const VkViewport& viewport,
+                       const VkRect2D& scissor,
+                       const VkDescriptorSet* main_view_camera_descriptor_set,
+                       const VkDescriptorSet* shadow_view_camera_descriptor_set,
+                       VkDeviceAddress instance_data_buffer_address) const;
 };
 
 constexpr uint32_t k_invalid_material_idx{ (uint32_t)-1 };
@@ -105,11 +114,12 @@ struct GPU_material_set
 };
 
 // Passing references.
-void set_descriptor_layout_references(
+void set_descriptor_references(
     VkDescriptorSetLayout main_camera_descriptor_layout,
     VkDescriptorSetLayout shadow_camera_descriptor_layout,
     VkDescriptorSetLayout material_sets_indexing_descriptor_layout,
-    VkDescriptorSetLayout material_agnostic_descriptor_layout);
+    VkDescriptorSetLayout material_agnostic_descriptor_layout,
+    VkDescriptorSet material_sets_indexing_descriptor_set);
 
 // Pipeline.
 GPU_pipeline create_geometry_material_pipeline(
