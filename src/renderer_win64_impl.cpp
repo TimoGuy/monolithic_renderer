@@ -254,7 +254,7 @@ int32_t Monolithic_renderer::Impl::Load_assets_job::execute()
             Mat_data{ .param_name = "color", .data{ ._vec4{ 0.2f, 0.0f, 0.2f, 1.0f } }, },
         },
     });
-    material_bank::cook_all_material_param_indices();
+    material_bank::cook_all_material_param_indices_and_pipeline_conns();
     TIMING_REPORT_END_AND_PRINT(reg_mats, "Register and Cook Materials: ");
 
     // Material sets.
@@ -353,6 +353,12 @@ int32_t Monolithic_renderer::Impl::Load_assets_job::execute()
                                                  material_bank::get_all_material_sets());
     m_pimpl.write_material_param_sets_to_descriptor_sets();
     TIMING_REPORT_END_AND_PRINT(upload_material_sets, "Upload Material Param Indices and Material Sets: ");
+
+    // Upload material param datas.
+    TIMING_REPORT_START(upload_material_param_datas);
+    material_bank::cook_and_upload_pipeline_material_param_datas_to_gpu();
+    TIMING_REPORT_END_AND_PRINT(upload_material_param_datas, "Upload Material Param Datas for Pipeline: ");
+
 
     // Upload bounding sphere data.
     TIMING_REPORT_START(upload_bs);
@@ -633,26 +639,28 @@ bool build_vulkan_renderer__vulkan(GLFWwindow* window,
     out_physical_device_properties = physical_device.properties;
 
     // Print phsyical device properties.
+    constexpr uint32_t k_built_sdk_version{ VK_HEADER_VERSION_COMPLETE };
     std::cout << "-=-=- Chosen Physical Device Properties -=-=-" << std::endl;
-    std::cout << "API_VERSION                          " << VK_API_VERSION_MAJOR(out_physical_device_properties.apiVersion) << "." << VK_API_VERSION_MINOR(out_physical_device_properties.apiVersion) << "." << VK_API_VERSION_PATCH(out_physical_device_properties.apiVersion) << "." << VK_API_VERSION_VARIANT(out_physical_device_properties.apiVersion) << std::endl;
-    std::cout << "DRIVER_VERSION                       " << out_physical_device_properties.driverVersion << std::endl;
-    std::cout << "VENDOR_ID                            " << out_physical_device_properties.vendorID << std::endl;
-    std::cout << "DEVICE_ID                            " << out_physical_device_properties.deviceID << std::endl;
-    std::cout << "DEVICE_TYPE                          " << out_physical_device_properties.deviceType << std::endl;
-    std::cout << "DEVICE_NAME                          " << out_physical_device_properties.deviceName << std::endl;
-    std::cout << "MAX_IMAGE_DIMENSION_1D               " << out_physical_device_properties.limits.maxImageDimension1D << std::endl;
-    std::cout << "MAX_IMAGE_DIMENSION_2D               " << out_physical_device_properties.limits.maxImageDimension2D << std::endl;
-    std::cout << "MAX_IMAGE_DIMENSION_3D               " << out_physical_device_properties.limits.maxImageDimension3D << std::endl;
-    std::cout << "MAX_IMAGE_DIMENSION_CUBE             " << out_physical_device_properties.limits.maxImageDimensionCube << std::endl;
-    std::cout << "MAX_IMAGE_ARRAY_LAYERS               " << out_physical_device_properties.limits.maxImageArrayLayers << std::endl;
-    std::cout << "MAX_SAMPLER_ANISOTROPY               " << out_physical_device_properties.limits.maxSamplerAnisotropy << std::endl;
-    std::cout << "MAX_BOUND_DESCRIPTOR_SETS            " << out_physical_device_properties.limits.maxBoundDescriptorSets << std::endl;
-    std::cout << "MINIMUM_BUFFER_ALIGNMENT             " << out_physical_device_properties.limits.minUniformBufferOffsetAlignment << std::endl;
-    std::cout << "MAX_COLOR_ATTACHMENTS                " << out_physical_device_properties.limits.maxColorAttachments << std::endl;
-    std::cout << "MAX_DRAW_INDIRECT_COUNT              " << out_physical_device_properties.limits.maxDrawIndirectCount << std::endl;
-    std::cout << "MAX_DESCRIPTOR_SET_SAMPLED_IMAGES    " << out_physical_device_properties.limits.maxDescriptorSetSampledImages << std::endl;
-    std::cout << "MAX_DESCRIPTOR_SET_SAMPLERS          " << out_physical_device_properties.limits.maxDescriptorSetSamplers << std::endl;
-    std::cout << "MAX_SAMPLER_ALLOCATION_COUNT         " << out_physical_device_properties.limits.maxSamplerAllocationCount << std::endl;
+    std::cout << "BUILT_SDK_VERSION                 : " << VK_API_VERSION_MAJOR(k_built_sdk_version) << "." << VK_API_VERSION_MINOR(k_built_sdk_version) << "." << VK_API_VERSION_PATCH(k_built_sdk_version) << "." << VK_API_VERSION_VARIANT(k_built_sdk_version) << std::endl;
+    std::cout << "API_VERSION                       : " << VK_API_VERSION_MAJOR(out_physical_device_properties.apiVersion) << "." << VK_API_VERSION_MINOR(out_physical_device_properties.apiVersion) << "." << VK_API_VERSION_PATCH(out_physical_device_properties.apiVersion) << "." << VK_API_VERSION_VARIANT(out_physical_device_properties.apiVersion) << std::endl;
+    std::cout << "DRIVER_VERSION(raw)               : " << out_physical_device_properties.driverVersion << std::endl;
+    std::cout << "VENDOR_ID                         : " << out_physical_device_properties.vendorID << std::endl;
+    std::cout << "DEVICE_ID                         : " << out_physical_device_properties.deviceID << std::endl;
+    std::cout << "DEVICE_TYPE                       : " << out_physical_device_properties.deviceType << std::endl;
+    std::cout << "DEVICE_NAME                       : " << out_physical_device_properties.deviceName << std::endl;
+    std::cout << "MAX_IMAGE_DIMENSION_1D            : " << out_physical_device_properties.limits.maxImageDimension1D << std::endl;
+    std::cout << "MAX_IMAGE_DIMENSION_2D            : " << out_physical_device_properties.limits.maxImageDimension2D << std::endl;
+    std::cout << "MAX_IMAGE_DIMENSION_3D            : " << out_physical_device_properties.limits.maxImageDimension3D << std::endl;
+    std::cout << "MAX_IMAGE_DIMENSION_CUBE          : " << out_physical_device_properties.limits.maxImageDimensionCube << std::endl;
+    std::cout << "MAX_IMAGE_ARRAY_LAYERS            : " << out_physical_device_properties.limits.maxImageArrayLayers << std::endl;
+    std::cout << "MAX_SAMPLER_ANISOTROPY            : " << out_physical_device_properties.limits.maxSamplerAnisotropy << std::endl;
+    std::cout << "MAX_BOUND_DESCRIPTOR_SETS         : " << out_physical_device_properties.limits.maxBoundDescriptorSets << std::endl;
+    std::cout << "MINIMUM_BUFFER_ALIGNMENT          : " << out_physical_device_properties.limits.minUniformBufferOffsetAlignment << std::endl;
+    std::cout << "MAX_COLOR_ATTACHMENTS             : " << out_physical_device_properties.limits.maxColorAttachments << std::endl;
+    std::cout << "MAX_DRAW_INDIRECT_COUNT           : " << out_physical_device_properties.limits.maxDrawIndirectCount << std::endl;
+    std::cout << "MAX_DESCRIPTOR_SET_SAMPLED_IMAGES : " << out_physical_device_properties.limits.maxDescriptorSetSampledImages << std::endl;
+    std::cout << "MAX_DESCRIPTOR_SET_SAMPLERS       : " << out_physical_device_properties.limits.maxDescriptorSetSamplers << std::endl;
+    std::cout << "MAX_SAMPLER_ALLOCATION_COUNT      : " << out_physical_device_properties.limits.maxSamplerAllocationCount << std::endl;
     std::cout << std::endl;
 
     // Build Vulkan device.

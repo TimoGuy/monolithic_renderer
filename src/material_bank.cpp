@@ -89,7 +89,7 @@ void material_bank::GPU_pipeline::bind_pipeline(
     if (use_material_params)
     {
         desc_sets[1] = s_material_sets_indexing_descriptor_set;
-        desc_sets[2] = combined_all_material_datas_descriptor_set;
+        desc_sets[2] = calculated.combined_all_material_datas_descriptor_set;
         assert(false);  // @TODO: @CHECK: This isn't setup yet!
     }
 
@@ -368,6 +368,191 @@ void material_bank::define_pipeline(const std::string& pipe_name,
     }
 }
 
+bool material_bank::cook_and_upload_pipeline_material_param_datas_to_gpu(
+    const vk_util::Immediate_submit_support& support,
+    VkDevice device,
+    VkQueue queue,
+    VmaAllocator allocator,
+    vk_desc::Descriptor_allocator& descriptor_alloc)
+{
+    std::lock_guard<std::mutex> lock1{ s_all_pipelines_mutex };
+    std::lock_guard<std::mutex> lock2{ s_all_materials_mutex };
+
+    for (auto& pipeline : s_all_pipelines)
+    {
+        if (pipeline.material_param_definitions.empty())
+        {
+            // No cooking needed for pipeline
+            // that doesn't have material customization.
+            continue;
+        }
+
+        // Size buffer.
+        size_t definition_data_block_size{
+            pipeline.calculated.material_param_block_size_padded };
+        size_t mat_param_definition_datas_buffer{
+            definition_data_block_size *
+                pipeline.calculated.materials_using_this_pipeline.size() };
+
+        // Create GPU and staging buffers.
+        pipeline.calculated.all_material_datas_buffer =
+            vk_buffer::create_buffer(allocator,
+                                     mat_param_definition_datas_buffer,
+                                     VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+                                         VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                                     VMA_MEMORY_USAGE_GPU_ONLY);
+        auto staging_buffer{
+            vk_buffer::create_buffer(allocator,
+                                     mat_param_definition_datas_buffer,
+                                     VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                                     VMA_MEMORY_USAGE_CPU_ONLY) };
+
+        // Fill staging buffer.
+        char* staging_buffer_data;
+        vmaMapMemory(allocator, staging_buffer.allocation, reinterpret_cast<void**>(&staging_buffer_data));
+
+        for (uint32_t i = 0;
+            i < static_cast<uint32_t>(
+                pipeline.calculated.materials_using_this_pipeline.size());
+            i++)
+        {
+            auto& material{ *pipeline.calculated.materials_using_this_pipeline[i] };
+
+            // Assert ordering in global material sets buffers is correct.
+            assert(material.cooked_material_param_local_idx == i);
+
+            size_t write_offset_base{ i * definition_data_block_size };
+
+            for (auto& data : material.material_param_datas)
+            for (auto& definition : pipeline.material_param_definitions)  // Search for a match.
+            if (data.param_name == definition.param_name)
+            {
+                void* copy_data{ nullptr };
+                size_t copy_size;
+
+                switch (definition.param_type)
+                {
+                case Mat_param_def_type::INT:
+                    copy_size = sizeof(int32_t);
+                    copy_data = &data.data._int;
+                    break;
+
+                case Mat_param_def_type::UINT:
+                    copy_size = sizeof(uint32_t);
+                    copy_data = &data.data._uint;
+                    break;
+
+                case Mat_param_def_type::FLOAT:
+                    copy_size = sizeof(float_t);
+                    copy_data = &data.data._float;
+                    break;
+
+                case Mat_param_def_type::IVEC2:
+                    copy_size = sizeof(ivec2);
+                    copy_data = data.data._ivec2;
+                    break;
+
+                case Mat_param_def_type::IVEC3:
+                    copy_size = sizeof(ivec3);
+                    copy_data = data.data._ivec3;
+                    break;
+
+                case Mat_param_def_type::IVEC4:
+                    copy_size = sizeof(ivec4);
+                    copy_data = data.data._ivec4;
+                    break;
+
+                case Mat_param_def_type::VEC2:
+                    copy_size = sizeof(vec2);
+                    copy_data = data.data._vec2;
+                    break;
+
+                case Mat_param_def_type::VEC3:
+                    copy_size = sizeof(vec3);
+                    copy_data = data.data._vec3;
+                    break;
+
+                case Mat_param_def_type::VEC4:
+                    copy_size = sizeof(vec4);
+                    copy_data = data.data._vec4;
+                    break;
+
+                case Mat_param_def_type::MAT3:
+                    copy_size = sizeof(mat3);
+                    copy_data = data.data._mat3;
+                    break;
+
+                case Mat_param_def_type::MAT4:
+                    copy_size = sizeof(mat4);
+                    copy_data = data.data._mat4;
+                    break;
+
+                case Mat_param_def_type::TEXTURE_NAME:
+                    // @TODO: IMPLEMENT!!
+                    assert(false);
+                    break;
+
+                default:
+                    // Unsupported type.
+                    assert(false);
+                    break;
+                }
+
+                assert(copy_data != nullptr);
+                memcpy(staging_buffer_data +
+                           write_offset_base +
+                           definition.calculated.param_block_offset,
+                       copy_data,
+                       copy_size);
+
+                // Move onto next material param data elem.
+                break;
+            }
+        }
+
+        vmaUnmapMemory(allocator, staging_buffer.allocation);
+
+        // Transfer staged data to GPU.
+        vk_util::immediate_submit(support, device, queue, [&](VkCommandBuffer cmd) {
+            VkBufferCopy mat_param_definition_datas_copy{
+                .srcOffset = 0,
+                .dstOffset = 0,
+                .size = mat_param_definition_datas_buffer,
+            };
+            vkCmdCopyBuffer(cmd,
+                            staging_buffer.buffer,
+                            pipeline.calculated.all_material_datas_buffer.buffer,
+                            1, &mat_param_definition_datas_copy);
+        });
+
+        // Create and write descriptor set for pipeline.
+        pipeline.calculated.combined_all_material_datas_descriptor_set =
+            descriptor_alloc.allocate(device, s_material_agnostic_descriptor_layout);
+
+        VkDescriptorBufferInfo all_material_datas_buffer_info{
+            .buffer = pipeline.calculated.all_material_datas_buffer.buffer,
+            .offset = 0,
+            .range = mat_param_definition_datas_buffer,
+        };
+        VkWriteDescriptorSet all_material_datas_buffer_write{
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .pNext = nullptr,
+            .dstSet = pipeline.calculated.combined_all_material_datas_descriptor_set,
+            .dstBinding = 0,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            .pBufferInfo = &all_material_datas_buffer_info,
+        };
+
+        vkUpdateDescriptorSets(device, 1, &all_material_datas_buffer_write, 0, nullptr);
+
+        // Clean up.
+        destroy_buffer(allocator, staging_buffer);
+    }
+
+    return true;
+}
+
 uint32_t material_bank::get_pipeline_idx_from_name(const std::string& pipe_name)
 {
     std::lock_guard<std::mutex> lock{ s_pipe_name_to_idx_mutex };
@@ -412,11 +597,12 @@ uint32_t material_bank::register_material(const std::string& mat_name,
     return emplace_idx;
 }
 
-bool material_bank::cook_all_material_param_indices()
+bool material_bank::cook_all_material_param_indices_and_pipeline_conns()
 {
     std::lock_guard<std::mutex> lock1{ s_all_pipelines_mutex };
     std::lock_guard<std::mutex> lock2{ s_all_materials_mutex };
 
+    // Cook material param local indices.
     std::vector<uint32_t> local_mat_counts;
     local_mat_counts.resize(s_all_pipelines.size(), 0);
 
@@ -424,6 +610,12 @@ bool material_bank::cook_all_material_param_indices()
     {
         uint32_t local_idx{ local_mat_counts[material.pipeline_idx]++ };
         material.cooked_material_param_local_idx = local_idx;
+
+        // Connect material to pipeline.
+        s_all_pipelines[material.pipeline_idx]
+            .calculated
+            .materials_using_this_pipeline
+            .emplace_back(&material);
     }
 
     return true;

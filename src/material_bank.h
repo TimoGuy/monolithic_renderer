@@ -5,6 +5,8 @@
 #include <vector>
 #include <vulkan/vulkan.h>
 #include "cglm/types.h"
+#include "renderer_win64_vk_buffer.h"
+#include "renderer_win64_vk_descriptor_layout_builder.h"
 
 
 // @NOTE: A material is only for the geometry pipelines.
@@ -46,7 +48,7 @@ struct Material_parameter_definition
     struct Calculated
     {
         size_t param_block_offset;
-        size_t param_size_padded;
+        size_t param_size_padded;  // @TODO: @CHECK: Is this necessary??? It doesn't seem used.
     } calculated;
 };
 
@@ -71,6 +73,8 @@ struct Material_parameter_data
     } data;
 };
 
+struct GPU_material;
+
 struct GPU_pipeline
 {
     VkPipeline pipeline;
@@ -80,13 +84,16 @@ struct GPU_pipeline
 
     Camera_type camera_type;
     std::vector<Material_parameter_definition> material_param_definitions;
-    VkDescriptorSet combined_all_material_datas_descriptor_set;
 
     // @NOTE: Calculated in construction.
     struct Calculated
     {
         uint32_t pipeline_creation_idx;
         size_t material_param_block_size_padded{ 0 };
+
+        std::vector<GPU_material*> materials_using_this_pipeline;
+        vk_buffer::Allocated_buffer all_material_datas_buffer;  // @TODO: START HERE!!!! Solve this circular dependency. :(
+        VkDescriptorSet combined_all_material_datas_descriptor_set;
     } calculated;
 
     void bind_pipeline(VkCommandBuffer cmd,
@@ -139,6 +146,13 @@ void define_pipeline(const std::string& pipe_name,
                      const std::string& optional_shadow_pipe_name,
                      GPU_pipeline&& new_pipeline);
 
+bool cook_and_upload_pipeline_material_param_datas_to_gpu(
+    const vk_util::Immediate_submit_support& support,
+    VkDevice device,
+    VkQueue queue,
+    VmaAllocator allocator,
+    vk_desc::Descriptor_allocator& descriptor_alloc);
+
 uint32_t get_pipeline_idx_from_name(const std::string& pipe_name);
 
 const GPU_pipeline& get_pipeline(uint32_t idx);
@@ -149,7 +163,7 @@ bool teardown_all_pipelines();
 uint32_t register_material(const std::string& mat_name,
                            GPU_material&& new_material);
 
-bool cook_all_material_param_indices();
+bool cook_all_material_param_indices_and_pipeline_conns();
 
 uint32_t get_mat_idx_from_name(const std::string& mat_name);
 
