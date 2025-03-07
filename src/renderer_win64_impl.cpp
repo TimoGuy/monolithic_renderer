@@ -1566,8 +1566,8 @@ bool Monolithic_renderer::Impl::teardown_imgui()
 // Setup jobs.
 bool Monolithic_renderer::Impl::setup_initial_camera_props()
 {
-    camera::set_aspect_ratio(m_pimpl.m_window_width,
-                             m_pimpl.m_window_height);
+    camera::set_aspect_ratio(m_window_width,
+                             m_window_height);
     camera::set_fov(glm_rad(70.0f));
     camera::set_near_far(0.1f, 1000.0f);
     camera::set_view(vec3{ 0.0f, 1.0f, -5.0f },
