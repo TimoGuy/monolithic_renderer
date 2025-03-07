@@ -225,13 +225,6 @@ private:
     bool teardown_vulkan_renderer();
     bool wait_for_renderer_idle();
 
-    // Dear Imgui setup/run/teardown.
-    bool build_imgui();
-    bool teardown_imgui();
-    std::atomic_bool m_imgui_enabled{ true };
-    std::atomic_bool m_imgui_visible{ true };
-    VkDescriptorPool m_v_imgui_pool;
-
     // Setup jobs.
     bool setup_initial_camera_props();
 
@@ -243,7 +236,6 @@ private:
     bool update_window();
     bool update_and_upload_render_data();
     bool render();
-    bool render__imgui();
 
     std::string m_name;
     int32_t m_window_width;

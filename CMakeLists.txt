@@ -44,6 +44,8 @@ add_library(${PROJECT_NAME}
     ${CMAKE_CURRENT_SOURCE_DIR}/src/geo_instance.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gltf_loader.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gltf_loader.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/imgui_system.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/imgui_system.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/material_bank.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/material_bank.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/renderer.cpp
