@@ -5,8 +5,10 @@
 #include <vector>
 #include <vulkan/vulkan.h>
 #include "cglm/types.h"
-#include "renderer_win64_vk_buffer.h"
+#include "renderer_win64_vk_buffer__allocated_buffer.h"
 #include "renderer_win64_vk_descriptor_layout_builder.h"
+
+namespace vk_util { struct Immediate_submit_support; }
 
 
 // @NOTE: A material is only for the geometry pipelines.

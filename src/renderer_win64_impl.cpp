@@ -54,6 +54,18 @@ int32_t Monolithic_renderer::Impl::Build_job::execute()
     success &= m_pimpl.build_window();
     success &= m_pimpl.build_vulkan_renderer();
     success &= m_pimpl.build_imgui();
+
+    // @TODO: Add setting up camera into its own func.
+    camera::set_aspect_ratio(m_pimpl.m_window_width,
+                             m_pimpl.m_window_height);
+    camera::set_fov(glm_rad(70.0f));
+    camera::set_near_far(0.1f, 1000.0f);
+    camera::set_view(vec3{ 0.0f, 1.0f, -5.0f },
+                     glm_rad(0.0f),
+                     glm_rad(-30.0f));
+    assert(false);  // @TODO: START HERE
+    //////////////////////////////////////////////////
+
     return success ? 0 : 1;
 }
 
@@ -356,7 +368,12 @@ int32_t Monolithic_renderer::Impl::Load_assets_job::execute()
 
     // Upload material param datas.
     TIMING_REPORT_START(upload_material_param_datas);
-    material_bank::cook_and_upload_pipeline_material_param_datas_to_gpu();
+    material_bank::cook_and_upload_pipeline_material_param_datas_to_gpu(
+        m_pimpl.m_immediate_submit_support,
+        m_pimpl.m_v_device,
+        m_pimpl.m_v_graphics_queue,
+        m_pimpl.m_v_vma_allocator,
+        m_pimpl.m_v_descriptor_alloc);
     TIMING_REPORT_END_AND_PRINT(upload_material_param_datas, "Upload Material Param Datas for Pipeline: ");
 
 
@@ -2200,6 +2217,23 @@ bool Monolithic_renderer::Impl::render()
     auto& v_current_swapchain_image{ m_v_swapchain.images[swapchain_image_idx] };
     auto& v_current_swapchain_image_view{ m_v_swapchain.image_views[swapchain_image_idx] };
 
+    // Upload camera information.
+    {
+        mat4 projection;
+        std::vector<mat4s> shadow_cascades;
+        camera::GPU_camera camera_data;
+        camera::fetch_matrices(projection,
+                               camera_data.view,
+                               camera_data.projection_view,
+                               shadow_cascades);
+
+        void* data;
+        vmaMapMemory(m_v_vma_allocator, current_frame.camera_buffer.allocation, &data);
+        memcpy(data, &camera_data, sizeof(camera::GPU_camera));
+        vmaUnmapMemory(m_v_vma_allocator, current_frame.camera_buffer.allocation);
+    }
+
+
     // Render Imgui.
     const bool display_imgui{ m_imgui_enabled && m_imgui_visible };
     if (display_imgui)
@@ -2221,11 +2255,11 @@ bool Monolithic_renderer::Impl::render()
                                   VK_IMAGE_LAYOUT_UNDEFINED,
                                   VK_IMAGE_LAYOUT_GENERAL);
         render__clear_background(cmd, m_v_HDR_draw_image.image);
-        render__run_sample_pass(cmd,
-                                m_v_sample_pass.descriptor_set,
-                                m_v_sample_pass.pipeline,
-                                m_v_sample_pass.pipeline_layout,
-                                m_v_HDR_draw_image.extent);
+        // render__run_sample_pass(cmd,
+        //                         m_v_sample_pass.descriptor_set,
+        //                         m_v_sample_pass.pipeline,
+        //                         m_v_sample_pass.pipeline_layout,
+        //                         m_v_HDR_draw_image.extent);
         
         // Geometry rendering.
         vk_util::transition_image(cmd,
@@ -2291,10 +2325,10 @@ bool Monolithic_renderer::Impl::render()
                                          current_geo_frame.culled_indirect_command_buffer.buffer,
                                          current_geo_frame.indirect_counts_buffer.buffer);
 
-        render__run_sample_geometry_pass(cmd,
-                                         m_v_HDR_draw_image.image.image_view,
-                                         m_v_HDR_draw_image.extent,
-                                         m_v_sample_graphics_pass.pipeline);
+        // render__run_sample_geometry_pass(cmd,
+        //                                  m_v_HDR_draw_image.image.image_view,
+        //                                  m_v_HDR_draw_image.extent,
+        //                                  m_v_sample_graphics_pass.pipeline);
 
         // Swapchain.
         render__blit_HDR_image_to_swapchain(cmd,

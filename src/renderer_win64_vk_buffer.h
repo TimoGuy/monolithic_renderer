@@ -10,6 +10,7 @@
 #include "gltf_loader.h"
 #include "gpu_geo_data.h"
 #include "material_bank.h"
+#include "renderer_win64_vk_buffer__allocated_buffer.h"
 
 
 namespace vk_util{ struct Immediate_submit_support; }
@@ -17,13 +18,6 @@ using GPU_vertex = gltf_loader::GPU_vertex;
 
 namespace vk_buffer
 {
-
-struct Allocated_buffer
-{
-    VkBuffer buffer;
-    VmaAllocation allocation;
-    VmaAllocationInfo info;
-};
 
 Allocated_buffer create_buffer(VmaAllocator allocator,
                                size_t size,

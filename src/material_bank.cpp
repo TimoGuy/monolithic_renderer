@@ -4,6 +4,7 @@
 #include <iostream>
 #include <mutex>
 #include <unordered_map>
+#include "renderer_win64_vk_buffer.h"
 #include "renderer_win64_vk_pipeline_builder.h"
 
 
@@ -90,7 +91,6 @@ void material_bank::GPU_pipeline::bind_pipeline(
     {
         desc_sets[1] = s_material_sets_indexing_descriptor_set;
         desc_sets[2] = calculated.combined_all_material_datas_descriptor_set;
-        assert(false);  // @TODO: @CHECK: This isn't setup yet!
     }
 
     // Bind descriptor sets.
