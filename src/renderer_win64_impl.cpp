@@ -54,18 +54,7 @@ int32_t Monolithic_renderer::Impl::Build_job::execute()
     success &= m_pimpl.build_window();
     success &= m_pimpl.build_vulkan_renderer();
     success &= m_pimpl.build_imgui();
-
-    // @TODO: Add setting up camera into its own func.
-    camera::set_aspect_ratio(m_pimpl.m_window_width,
-                             m_pimpl.m_window_height);
-    camera::set_fov(glm_rad(70.0f));
-    camera::set_near_far(0.1f, 1000.0f);
-    camera::set_view(vec3{ 0.0f, 1.0f, -5.0f },
-                     glm_rad(0.0f),
-                     glm_rad(-30.0f));
-    assert(false);  // @TODO: START HERE
-    //////////////////////////////////////////////////
-
+    success &= m_pimpl.setup_initial_camera_props();
     return success ? 0 : 1;
 }
 
@@ -1574,6 +1563,19 @@ bool Monolithic_renderer::Impl::teardown_imgui()
     return result;
 }
 
+// Setup jobs.
+bool Monolithic_renderer::Impl::setup_initial_camera_props()
+{
+    camera::set_aspect_ratio(m_pimpl.m_window_width,
+                             m_pimpl.m_window_height);
+    camera::set_fov(glm_rad(70.0f));
+    camera::set_near_far(0.1f, 1000.0f);
+    camera::set_view(vec3{ 0.0f, 1.0f, -5.0f },
+                     glm_rad(0.0f),
+                     glm_rad(-30.0f));
+    return true;
+}
+
 // Misc??????
 bool Monolithic_renderer::Impl::write_material_param_sets_to_descriptor_sets()
 {
@@ -2231,6 +2233,8 @@ bool Monolithic_renderer::Impl::render()
         vmaMapMemory(m_v_vma_allocator, current_frame.camera_buffer.allocation, &data);
         memcpy(data, &camera_data, sizeof(camera::GPU_camera));
         vmaUnmapMemory(m_v_vma_allocator, current_frame.camera_buffer.allocation);
+        
+        assert(false);  // @TODO: GET A MOVABLE CAMERA GOING!!!
     }
 
 

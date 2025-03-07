@@ -232,6 +232,9 @@ private:
     std::atomic_bool m_imgui_visible{ true };
     VkDescriptorPool m_v_imgui_pool;
 
+    // Setup jobs.
+    bool setup_initial_camera_props();
+
     // Misc?????
     bool write_material_param_sets_to_descriptor_sets();
     bool write_bounding_spheres_to_descriptor_sets();
