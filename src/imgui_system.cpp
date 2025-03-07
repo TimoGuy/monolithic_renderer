@@ -12,6 +12,9 @@
 #include "renderer_win64_vk_util.h"
 #endif  // _WIN64
 
+// Externally reaching systems.
+#include "camera.h"
+
 
 namespace imgui_system
 {
@@ -145,6 +148,35 @@ bool render_imgui__demo_window()
     return true;
 }
 
+bool render_imgui__camera_props()
+{
+    auto cam_data{ camera::get_imgui_data() };
+    bool changed{ false };
+
+    ImGui::Begin("Camera Properties");
+    {
+        changed |= ImGui::DragFloat("aspect_ratio", &cam_data.aspect_ratio);
+        changed |= ImGui::DragFloat("fov_deg", &cam_data.fov_deg);
+        changed |= ImGui::DragFloat("near", &cam_data.near);
+        changed |= ImGui::DragFloat("far", &cam_data.far);
+
+        ImGui::Separator();
+
+        changed |= ImGui::DragFloat3("position", cam_data.position);
+        changed |= ImGui::DragFloat("pan_deg", &cam_data.pan_deg);
+        changed |= ImGui::DragFloat("tilt_deg", &cam_data.tilt_deg);
+    }
+    ImGui::End();
+
+    // Process changes.
+    if (changed)
+    {
+        camera::set_imgui_data(std::move(cam_data));
+    }
+
+    return true;
+}
+
 bool imgui_system::render_imgui()
 {
     bool result{ true };
@@ -157,6 +189,7 @@ bool imgui_system::render_imgui()
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
         result &= render_imgui__demo_window();
+        result &= render_imgui__camera_props();
         ImGui::Render();
     }
 

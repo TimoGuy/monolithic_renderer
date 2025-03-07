@@ -31,8 +31,13 @@ void internal__set_view_direction_and_rotation_axes(vec3 view_direction,
 
 void camera::set_aspect_ratio(uint32_t screen_width, uint32_t screen_height)
 {
-    s_aspect_ratio =
-        static_cast<float_t>(screen_width) / static_cast<float_t>(screen_height);
+    set_aspect_ratio_float(
+        static_cast<float_t>(screen_width) / static_cast<float_t>(screen_height));
+}
+
+void camera::set_aspect_ratio_float(float_t aspect_ratio)
+{
+    s_aspect_ratio = aspect_ratio;
     s_projection_cache_invalid = true;
 }
 
@@ -146,6 +151,34 @@ void camera::fetch_matrices(mat4& out_projection,
     glm_mat4_copy(s_calculated_view_matrix, out_view);
     glm_mat4_copy(s_calculated_projection_view_matrix, out_projection_view);
     out_shadow_cascades = s_calculated_shadow_cascade_matrices;
+}
+
+// Details for Imgui.
+camera::Imgui_requesting_data camera::get_imgui_data()
+{
+    Imgui_requesting_data data{
+        .aspect_ratio = s_aspect_ratio,
+        .fov_deg = glm_deg(s_fov),
+        .near = s_z_near,
+        .far = s_z_far,
+
+        // .position = ,
+        .pan_deg = glm_deg(s_cam_rot_axes[1]),
+        .tilt_deg = glm_deg(s_cam_rot_axes[0]),
+    };
+    glm_vec3_copy(s_cam_position, data.position);
+
+    return data;
+}
+
+void camera::set_imgui_data(Imgui_requesting_data&& changed_data)
+{
+    set_aspect_ratio_float(changed_data.aspect_ratio);
+    set_fov(glm_rad(changed_data.fov_deg));
+    set_near_far(changed_data.near, changed_data.far);
+    set_view(changed_data.position,
+             glm_rad(changed_data.pan_deg),
+             glm_rad(changed_data.tilt_deg));
 }
 
 // Internal functions.
