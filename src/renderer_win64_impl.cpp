@@ -2291,7 +2291,8 @@ bool Monolithic_renderer::Impl::render()
             .visible_result_buffer_address = current_geo_frame.visible_result_buffer_address,
         };
 
-        render__run_camera_view_geometry_culling(cmd,
+        render__run_camera_view_geometry_culling(
+            cmd,
             current_per_frame_data.camera_data.descriptor_set,
             m_v_geometry_graphics_pass.bounding_spheres_data.descriptor_set,
             geom_culling_pc,
@@ -2302,7 +2303,7 @@ bool Monolithic_renderer::Impl::render()
             m_v_graphics_queue_family_idx);
 
         GPU_write_draw_cmds_push_constants write_draw_cmds_pc{
-            .num_primitives =  // @TODO: @CHECK: I wonder if this should be for all primitives instead of just opaque ones.
+            .num_primitives =
                 geo_instance::get_number_primitives(geo_instance::Geo_render_pass::OPAQUE),
             .visible_result_buffer_address = current_geo_frame.visible_result_buffer_address,
             .base_indices_buffer_address = current_geo_frame.primitive_group_base_index_buffer_address,
@@ -2312,6 +2313,7 @@ bool Monolithic_renderer::Impl::render()
             .draw_command_counts_buffer_address = current_geo_frame.indirect_counts_buffer_address,
         };
 
+        // @NOTE: this writes draw cmds for just opaque geo pass.
         render__run_write_camera_view_geometry_draw_cmds(cmd,
                                                          write_draw_cmds_pc,
                                                          geo_instance::get_num_primitive_render_groups(
