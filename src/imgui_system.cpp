@@ -31,6 +31,7 @@ static VkDescriptorPool s_v_imgui_pool;
 
 // Setup/teardown.
 #if _WIN64
+
 bool imgui_system::build_imgui(
     GLFWwindow* window,
     VkInstance instance,
@@ -108,6 +109,7 @@ bool imgui_system::build_imgui(
     s_imgui_setup = true;
     return result;
 }
+
 #endif  // _WIN64
 
 bool imgui_system::teardown_imgui()
@@ -163,6 +165,7 @@ bool imgui_system::render_imgui()
 
 // Actual drawing.
 #if _WIN64
+
 bool imgui_system::render_imgui_onto_swapchain(
     VkCommandBuffer cmd,
     VkExtent2D render_extent,
@@ -190,4 +193,5 @@ bool imgui_system::render_imgui_onto_swapchain(
 
     return true;
 }
+
 #endif  // _WIN64
