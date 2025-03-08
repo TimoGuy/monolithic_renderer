@@ -37,8 +37,11 @@ Monolithic_renderer::Impl::Impl(const std::string& name,
     , m_window_height(content_height)
     , m_fallback_window_width(fallback_content_width)
     , m_fallback_window_height(fallback_content_height)
+    , m_build_window_job(std::make_unique<Build_window_job>(source, *this))
     , m_build_job(std::make_unique<Build_job>(source, *this))
     , m_load_assets_job(std::make_unique<Load_assets_job>(source, *this))
+    , m_update_poll_window_events_job(
+        std::make_unique<Update_poll_window_events_job>(source))
     , m_update_data_job(std::make_unique<Update_data_job>(source, *this))
     , m_render_job(std::make_unique<Render_job>(source, *this))
     , m_teardown_job(std::make_unique<Teardown_job>(source, *this))
@@ -46,10 +49,16 @@ Monolithic_renderer::Impl::Impl(const std::string& name,
 }
 
 // Jobs.
-int32_t Monolithic_renderer::Impl::Build_job::execute()
+int32_t Monolithic_renderer::Impl::Build_window_job::execute()
 {
     bool success{ true };
     success &= m_pimpl.build_window();
+    return success ? 0 : 1;
+}
+
+int32_t Monolithic_renderer::Impl::Build_job::execute()
+{
+    bool success{ true };
     success &= m_pimpl.build_vulkan_renderer();
 
     imgui_system::set_imgui_enabled(true);
@@ -400,10 +409,19 @@ int32_t Monolithic_renderer::Impl::Load_assets_job::execute()
     return 0;
 }
 
+int32_t Monolithic_renderer::Impl::Update_poll_window_events_job::execute()
+{
+    bool success{ true };
+
+    glfwPollEvents();
+
+    return success ? 0 : 1;
+}
+
 int32_t Monolithic_renderer::Impl::Update_data_job::execute()
 {
     bool success{ true };
-    success &= m_pimpl.update_window();
+    // @TODO: Implement.
     return success ? 0 : 1;
 }
 
@@ -438,6 +456,13 @@ Job_source::Job_next_jobs_return_data Monolithic_renderer::Impl::fetch_next_jobs
 
     switch (m_stage.load())
     {
+        case Stage::BUILD_WINDOW:
+            return_data.jobs = {
+                m_build_window_job.get(),
+            };
+            m_stage = Stage::BUILD;
+            break;
+
         case Stage::BUILD:
             return_data.jobs = {
                 m_build_job.get(),
@@ -454,6 +479,7 @@ Job_source::Job_next_jobs_return_data Monolithic_renderer::Impl::fetch_next_jobs
 
         case Stage::UPDATE_DATA:
             return_data.jobs = {
+                m_update_poll_window_events_job.get(),
                 m_update_data_job.get(),
             };
             m_stage = Stage::RENDER;
@@ -1574,19 +1600,8 @@ bool Monolithic_renderer::Impl::write_bounding_spheres_to_descriptor_sets()
 }
 
 // Tick procedures.
-bool Monolithic_renderer::Impl::update_window()
-{
-    // glfwPollEvents();
-
-    // @TODO
-
-    return true;
-}
-
 bool Monolithic_renderer::Impl::update_and_upload_render_data()
 {
-    glfwPollEvents();
-
     // Update.
     TIMING_REPORT_START(rebucket);
     std::vector<vk_buffer::GPU_geo_per_frame_buffer*> all_per_frame_buffers;
@@ -2145,7 +2160,7 @@ bool Monolithic_renderer::Impl::render()
         memcpy(data, &camera_data, sizeof(camera::GPU_camera));
         vmaUnmapMemory(m_v_vma_allocator, current_frame.camera_buffer.allocation);
         
-        //assert(false);  // @TODO: FIGURE OUT THE GLFW POLLING ISSUE STUFF.
+        //assert(false);  // @TODO: START HERE!!!! FIGURE OUT THE GLFW POLLING ISSUE STUFF.
 
         // @THOUGHT: So it looks like the GLFW polling thing doesn't affect the actual
         //   rendering. I think the below vv is very very smooth. Unfortunately, Imgui

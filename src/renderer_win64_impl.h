@@ -77,22 +77,17 @@ public:
 
     enum class Stage : uint32_t
     {
-        BUILD = 0,
+        BUILD_WINDOW = 0,
+        BUILD,
         LOAD_ASSETS,
         UPDATE_DATA,
         RENDER,
         TEARDOWN,
         END_OF_LIFE,
     };
-    std::atomic<Stage> m_stage{ Stage::BUILD };
+    std::atomic<Stage> m_stage{ Stage::BUILD_WINDOW };
     std::atomic_bool m_shutdown_flag{ false };
     std::atomic_bool m_finished_shutdown{ false };
-
-    void tick()
-    {
-        update_window();
-        render();
-    }
 
     void notify_uniconification()
     {
@@ -115,6 +110,23 @@ public:
     }
 
     // Jobs.
+    inline static const uint32_t k_glfw_window_job_key{ 0xB00B1E55 };
+
+    class Build_window_job : public Job_ifc
+    {
+    public:
+        Build_window_job(Job_source& source, Monolithic_renderer::Impl& pimpl)
+            : Job_ifc("Window Build job", source, k_glfw_window_job_key)
+            , m_pimpl(pimpl)
+        {
+        }
+
+        int32_t execute() override;
+
+        Monolithic_renderer::Impl& m_pimpl;
+    };
+    std::unique_ptr<Build_window_job> m_build_window_job;
+
     class Build_job : public Job_ifc
     {
     public:
@@ -144,6 +156,18 @@ public:
         Monolithic_renderer::Impl& m_pimpl;
     };
     std::unique_ptr<Load_assets_job> m_load_assets_job;
+
+    class Update_poll_window_events_job : public Job_ifc
+    {
+    public:
+        Update_poll_window_events_job(Job_source& source)
+            : Job_ifc("Poll Window Events job", source, k_glfw_window_job_key)
+        {
+        }
+
+        int32_t execute() override;
+    };
+    std::unique_ptr<Update_poll_window_events_job> m_update_poll_window_events_job;
 
     class Update_data_job : public Job_ifc
     {
@@ -233,7 +257,6 @@ private:
     bool write_bounding_spheres_to_descriptor_sets();
 
     // Tick procedures.
-    bool update_window();
     bool update_and_upload_render_data();
     bool render();
 
