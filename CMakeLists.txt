@@ -102,6 +102,7 @@ target_include_directories(${PROJECT_NAME}
         ${CMAKE_CURRENT_SOURCE_DIR}/third_party/vk-bootstrap
         ${CMAKE_CURRENT_SOURCE_DIR}/third_party/VulkanMemoryAllocator/include
         ${cglm_INCLUDE_DIR}
+        ${input_handling_INCLUDE_DIR}
         ${multithreaded_job_system_INCLUDE_DIR}
         ${Vulkan_INCLUDE_DIR}
         ${timing_reporter_macro_magic_INCLUDE_DIR}

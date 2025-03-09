@@ -45,26 +45,6 @@ constexpr uint32_t k_frame_overlap{ 2 };
 
 extern std::atomic<Monolithic_renderer*> s_mr_singleton_ptr;
 
-static void key_callback(GLFWwindow* window, int32_t key, int32_t scancode, int32_t action, int32_t mods)
-{
-
-}
-
-static void window_focus_callback(GLFWwindow* window, int32_t focused)
-{
-
-}
-
-static void window_iconify_callback(GLFWwindow* window, int32_t iconified)
-{
-    // Check if window was placed back and should resume rendering.
-    if (iconified == GLFW_FALSE)
-    {
-        std::cout << "NOTE: window unminimized. Resuming renderer." << std::endl;
-        s_mr_singleton_ptr.load()->notify_windowevent_uniconification();
-    }
-}
-
 class Monolithic_renderer::Impl
 {
 public:

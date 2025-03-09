@@ -16,12 +16,79 @@
 #include "geo_instance.h"
 #include "gltf_loader.h"
 #include "imgui_system.h"
+#include "input_handling_public.h"
 #include "material_bank.h"
 #include "multithreaded_job_system_public.h"
 #include "renderer_win64_vk_pipeline_builder.h"
 #include "renderer_win64_vk_util.h"
 #include "timing_reporter_public.h"
 
+
+// Callbacks for input.
+static void key_callback(GLFWwindow* window,
+                         int32_t key,
+                         int32_t scancode,
+                         int32_t action,
+                         int32_t mods)
+{
+    switch (action)
+    {
+    case GLFW_PRESS:
+    case GLFW_RELEASE:
+        input_handling::report_keyboard_input_change(
+            key,
+            (action == GLFW_PRESS ? true : false));
+        break;
+    }
+}
+
+static void mouse_button_callback(GLFWwindow* window,
+                                  int32_t button,
+                                  int32_t action,
+                                  int32_t mods)
+{
+    switch (action)
+    {
+    case GLFW_PRESS:
+    case GLFW_RELEASE:
+        input_handling::report_mouse_button_input_change(
+            button,
+            (action == GLFW_PRESS ? true : false));
+        break;
+    }
+}
+
+static void cursor_position_callback(GLFWwindow* window,
+                                     double_t xpos,
+                                     double_t ypos)
+{
+    input_handling::report_mouse_position_change(
+        vec2{ static_cast<float_t>(xpos),
+              static_cast<float_t>(ypos) });
+}
+
+static void scroll_callback(GLFWwindow* window,
+                            double_t xoffset,
+                            double_t yoffset)
+{
+    input_handling::report_mouse_scroll_input_change(yoffset);
+}
+
+static void window_focus_callback(GLFWwindow* window,
+                                  int32_t focused)
+{
+}
+
+static void window_iconify_callback(GLFWwindow* window,
+                                    int32_t iconified)
+{
+    // Check if window was placed back and should resume rendering.
+    if (iconified == GLFW_FALSE)
+    {
+        std::cout << "NOTE: window unminimized. Resuming renderer." << std::endl;
+        s_mr_singleton_ptr.load()->notify_windowevent_uniconification();
+    }
+}
 
 // For extern symbol.
 std::atomic<Monolithic_renderer*> s_mr_singleton_ptr{ nullptr };
@@ -413,7 +480,9 @@ int32_t Monolithic_renderer::Impl::Update_poll_window_events_job::execute()
 {
     bool success{ true };
 
+    input_handling::start_reporting_frame();
     glfwPollEvents();
+    input_handling::end_reporting_frame();
 
     return success ? 0 : 1;
 }
@@ -532,7 +601,7 @@ bool Monolithic_renderer::Impl::build_window()
                            &monitor_workarea.ypos,
                            &monitor_workarea.width,
                            &monitor_workarea.height);
-    
+
     if (m_window_width >= monitor_workarea.width ||
         m_window_height >= monitor_workarea.height)
     {
@@ -565,7 +634,11 @@ bool Monolithic_renderer::Impl::build_window()
         return false;
     }
 
+    // Window callbacks.
     glfwSetKeyCallback(m_window, key_callback);
+    glfwSetMouseButtonCallback(m_window, mouse_button_callback);
+    glfwSetCursorPosCallback(m_window, cursor_position_callback);
+    glfwSetScrollCallback(m_window, scroll_callback);
     glfwSetWindowFocusCallback(m_window, window_focus_callback);
     glfwSetWindowIconifyCallback(m_window, window_iconify_callback);
 
@@ -661,7 +734,7 @@ bool build_vulkan_renderer__vulkan(GLFWwindow* window,
             .set_required_features({
                 // @NOTE: @FEATURES: Enable required features right here
                 // .multiDrawIndirect = VK_TRUE,         // So that vkCmdDrawIndexedIndirect() can be called with a >1 drawCount. (@NOTE: not happening with current setup)
-                .depthClamp = VK_TRUE,				  // For shadow maps, this is really nice.
+                .depthClamp = VK_TRUE,                // For shadow maps, this is really nice.
                 .fillModeNonSolid = VK_TRUE,          // To render wireframes.
                 .samplerAnisotropy = VK_TRUE,
                 .fragmentStoresAndAtomics = VK_TRUE,  // For the picking buffer! @TODO: If a release build then disable.
