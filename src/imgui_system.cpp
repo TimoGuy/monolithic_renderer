@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <cassert>
+#include <mutex>
 #include <string>
 #include "imgui.h"
 
@@ -25,6 +26,8 @@ static std::atomic_bool s_imgui_setup{ false };
 
 static std::atomic_bool s_imgui_enabled{ false };
 static std::atomic_bool s_imgui_visible{ false };
+
+static std::mutex s_imgui_mutex;
 
 #if _WIN64
 static VkDevice s_v_device;
@@ -133,6 +136,19 @@ bool imgui_system::teardown_imgui()
     return result;
 }
 
+// Memory barriers.
+void imgui_system::mutex_lock()
+{
+    if (s_imgui_setup)
+        s_imgui_mutex.lock();
+}
+
+void imgui_system::mutex_unlock()
+{
+    if (s_imgui_setup)
+        s_imgui_mutex.unlock();
+}
+
 // Rendering.
 void imgui_system::set_imgui_enabled(bool flag)
 {
@@ -187,7 +203,7 @@ bool render_imgui__input_handling()
     {
         auto& ih{  // Smelly smelly code smell. vv
             const_cast<input_handling::Input_state_set&>(
-                input_handling::get_state_set(i)) };
+                input_handling::get_state_set_reading_handle(i)) };
 
         if (ImGui::CollapsingHeader(("Set " + std::to_string(i)).c_str(), ImGuiTreeNodeFlags_DefaultOpen))
         {

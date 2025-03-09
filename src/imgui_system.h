@@ -24,6 +24,10 @@ bool build_imgui(
 #endif  // _WIN64
 bool teardown_imgui();
 
+// Memory barriers.
+void mutex_lock();
+void mutex_unlock();
+
 // Rendering.
 void set_imgui_enabled(bool flag);
 void set_imgui_visible(bool flag);
