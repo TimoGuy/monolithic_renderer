@@ -635,6 +635,8 @@ bool Monolithic_renderer::Impl::build_window()
     }
 
     // Window callbacks.
+    // @NOTE: With key callbacks etc that's also used by Imgui, Imgui
+    //   chains these callbacks so they don't get lost.
     glfwSetKeyCallback(m_window, key_callback);
     glfwSetMouseButtonCallback(m_window, mouse_button_callback);
     glfwSetCursorPosCallback(m_window, cursor_position_callback);
