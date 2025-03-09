@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <cassert>
+#include <string>
 #include "imgui.h"
 
 #if _WIN64
@@ -14,6 +15,7 @@
 
 // Externally reaching systems.
 #include "camera.h"
+#include "input_handling_public.h"
 
 
 namespace imgui_system
@@ -177,6 +179,63 @@ bool render_imgui__camera_props()
     return true;
 }
 
+bool render_imgui__input_handling()
+{
+    ImGui::Begin("Input Handling Data");
+
+    for (uint32_t i = 0; i < input_handling::get_num_state_sets(); i++)
+    {
+        auto& ih{  // Smelly smelly code smell. vv
+            const_cast<input_handling::Input_state_set&>(
+                input_handling::get_state_set(i)) };
+
+        if (ImGui::CollapsingHeader(("Set " + std::to_string(i)).c_str(), ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            std::string suffix{ "## input handling data set " + std::to_string(i) };
+            #define IMGUI_IS__VEC2(s, x) ImGui::InputFloat2((#x + suffix).c_str(), s.x)
+            #define IMGUI_IS_IVEC2(s, x) ImGui::InputInt2((#x + suffix).c_str(), s.x)
+            #define IMGUI_IS_FLOAT(s, x) ImGui::InputFloat((#x + suffix).c_str(), &s.x)
+            #define IMGUI_IS__BOOL(s, x) ImGui::Checkbox((#x + suffix).c_str(), &s.x)
+
+            IMGUI_IS__VEC2(ih, gameplay.camera_delta);
+            IMGUI_IS__VEC2(ih, gameplay.movement);
+            IMGUI_IS__BOOL(ih, gameplay.jump);
+            IMGUI_IS__BOOL(ih, gameplay.dodge_sprint);
+            IMGUI_IS__BOOL(ih, gameplay.switch_weapon);
+            IMGUI_IS__BOOL(ih, gameplay.attack);
+            IMGUI_IS__BOOL(ih, gameplay.deflect_block);
+            IMGUI_IS__BOOL(ih, gameplay.toggle_lock);
+            IMGUI_IS__BOOL(ih, gameplay.interact);
+
+            ImGui::Separator();
+
+            IMGUI_IS__VEC2(ih, ui.cursor_position);
+            IMGUI_IS_FLOAT(ih, ui.scroll_delta);
+            IMGUI_IS_IVEC2(ih, ui.navigate_movement);
+            IMGUI_IS__BOOL(ih, ui.confirm);
+            IMGUI_IS__BOOL(ih, ui.cancel);
+
+            ImGui::Separator();
+
+            IMGUI_IS__VEC2(ih, level_editor.camera_delta);
+            IMGUI_IS__VEC2(ih, level_editor.movement);
+            IMGUI_IS_FLOAT(ih, level_editor.move_world_y_axis);
+            IMGUI_IS__BOOL(ih, level_editor.lshift_modifier);
+            IMGUI_IS__BOOL(ih, level_editor.lctrl_modifier);
+            IMGUI_IS__BOOL(ih, level_editor.camera_move);
+
+            #undef IMGUI_IS__VEC2(s, x)
+            #undef IMGUI_IS_IVEC2(s, x)
+            #undef IMGUI_IS_FLOAT(s, x)
+            #undef IMGUI_IS__BOOL(s, x)
+        }
+    }
+
+    ImGui::End();  // "Input Handling Data"
+
+    return true;
+}
+
 bool imgui_system::render_imgui()
 {
     bool result{ true };
@@ -190,6 +249,7 @@ bool imgui_system::render_imgui()
         ImGui::NewFrame();
         result &= render_imgui__demo_window();
         result &= render_imgui__camera_props();
+        result &= render_imgui__input_handling();
         ImGui::Render();
     }
 

@@ -480,9 +480,8 @@ int32_t Monolithic_renderer::Impl::Update_poll_window_events_job::execute()
 {
     bool success{ true };
 
-    input_handling::start_reporting_frame();
     glfwPollEvents();
-    input_handling::end_reporting_frame();
+    input_handling::end_reporting_swap_input_buffers();
 
     return success ? 0 : 1;
 }
