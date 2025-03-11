@@ -136,19 +136,6 @@ bool imgui_system::teardown_imgui()
     return result;
 }
 
-// Memory barriers.
-void imgui_system::mutex_lock()
-{
-    if (s_imgui_setup)
-        s_imgui_mutex.lock();
-}
-
-void imgui_system::mutex_unlock()
-{
-    if (s_imgui_setup)
-        s_imgui_mutex.unlock();
-}
-
 // Rendering.
 void imgui_system::set_imgui_enabled(bool flag)
 {

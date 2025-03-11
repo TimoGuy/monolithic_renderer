@@ -480,9 +480,7 @@ int32_t Monolithic_renderer::Impl::Update_poll_window_events_job::execute()
 {
     bool success{ true };
 
-    imgui_system::mutex_lock();
     glfwPollEvents();
-    imgui_system::mutex_unlock();
     input_handling::end_reporting_swap_input_buffers();
 
     return success ? 0 : 1;
@@ -2255,9 +2253,7 @@ bool Monolithic_renderer::Impl::render()
     }
 
     // Render Imgui.
-    imgui_system::mutex_lock();
     imgui_system::render_imgui();
-    imgui_system::mutex_unlock();
 
     // Write commands.
     VkCommandBuffer cmd{ current_frame.main_command_buffer };
@@ -2358,12 +2354,9 @@ bool Monolithic_renderer::Impl::render()
         //     to do a TO field for what you want to transition.
         render__prep_swapchain_image_for_draw_imgui(cmd,
                                                     v_current_swapchain_image);
-                                                    
-        imgui_system::mutex_lock();
         imgui_system::render_imgui_onto_swapchain(cmd,
                                                   m_v_swapchain.extent,
                                                   v_current_swapchain_image_view);
-        imgui_system::mutex_unlock();
         render__prep_swapchain_image_for_presentation(cmd,
                                                       v_current_swapchain_image,
                                                       VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
