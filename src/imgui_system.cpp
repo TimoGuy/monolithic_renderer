@@ -227,10 +227,10 @@ bool render_imgui__input_handling()
             IMGUI_IS__BOOL(ih, level_editor.lctrl_modifier);
             IMGUI_IS__BOOL(ih, level_editor.camera_move);
 
-            #undef IMGUI_IS__VEC2(s, x)
-            #undef IMGUI_IS_IVEC2(s, x)
-            #undef IMGUI_IS_FLOAT(s, x)
-            #undef IMGUI_IS__BOOL(s, x)
+            #undef IMGUI_IS__VEC2
+            #undef IMGUI_IS_IVEC2
+            #undef IMGUI_IS_FLOAT
+            #undef IMGUI_IS__BOOL
         }
     }
 
