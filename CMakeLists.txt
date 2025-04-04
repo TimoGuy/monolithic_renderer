@@ -107,7 +107,7 @@ target_include_directories(${PROJECT_NAME}
         ${multithreaded_job_system_INCLUDE_DIR}
         ${Vulkan_INCLUDE_DIR}
         ${timing_reporter_macro_magic_INCLUDE_DIR}
-        ${world_entity_INCLUDE_DIR}
+        ${ticking_world_simulation_INCLUDE_DIR}
 )
 
 target_link_libraries(${PROJECT_NAME}

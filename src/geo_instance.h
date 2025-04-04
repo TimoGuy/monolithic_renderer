@@ -8,6 +8,7 @@
 #include "gltf_loader.h"
 #include "gpu_geo_data.h"
 #include "renderer_win64_vk_buffer.h"
+namespace world_sim { class Transform_read_ifc; }
 
 
 namespace geo_instance
@@ -33,6 +34,10 @@ struct Geo_instance
     uint32_t cooked_buffer_instance_id;
 
     gpu_geo_data::GPU_geo_instance_data gpu_instance_data;
+
+    // Transform reader handle.
+    // @NOTE: If nullptr, then this geo instance will not pull from a transform holder.
+    Transform_read_ifc* transform_reader_handle{ nullptr };
 };
 
 // Primitive w/ corresponding ptr to instance.

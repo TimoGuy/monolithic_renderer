@@ -8,6 +8,7 @@
 #include <vk_mem_alloc.h>
 #include "geo_instance.h"
 #include "renderer_win64_vk_immediate_submit.h"
+#include "transform_read_ifc.h"  // From ticking_world_simulation component.
 
 
 namespace vk_buffer
@@ -517,6 +518,13 @@ void vk_buffer::upload_changed_per_frame_data(const vk_util::Immediate_submit_su
                      reinterpret_cast<void**>(&data));
         for (auto inst : unique_instances)
         {
+            // Update gpu transform data if there is a transform reader.
+            if (inst->transform_reader_handle != nullptr)
+            {
+                inst->transform_reader_handle->read_current_transform(
+                    inst->gpu_instance_data.transform);
+            }
+
             memcpy(data,
                    &inst->gpu_instance_data,
                    sizeof(gpu_geo_data::GPU_geo_instance_data));
