@@ -395,6 +395,9 @@ int32_t Monolithic_renderer::Impl::Load_assets_job::execute()
                                       m_pimpl.m_v_vma_allocator);
     TIMING_REPORT_END_AND_PRINT(upload_combined_mesh, "Load All Models and Upload Combined Mesh: ");
 
+    assert(false);  // @TODO: CREATE A WAY TO REGISTER GEO INSTANCES FROM THE GAME ENGINE!!!!
+                    //   So to get the engine connected to the renderer, there needs to be a way to create a geo instance with a transform reader. there is a connection to it and it's getting used now but there needs to be a way to actually create these connections in engine.cpp  -Thea 2025/04/04
+
     // @DEBUG: @NOCHECKIN: create some instances (for testing). //
     geo_instance::register_geo_instance(geo_instance::Geo_instance{
         .model_idx = 0,  // @TODO: figure out way to string lookup models.
