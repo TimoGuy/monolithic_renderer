@@ -465,6 +465,8 @@ void vk_buffer::upload_changed_per_frame_data(const vk_util::Immediate_submit_su
                                               VmaAllocator allocator,
                                               GPU_geo_per_frame_buffer& frame_buffer)
 {
+    assert(false);  // @INCOMPLETE: (Line 524) Need to set `changes_processed = false;` when a tranform reader handle wants to update the transform information.  -Thea 2025/04/04
+
     // Exit if no changes.
     if (frame_buffer.changes_processed)
         return;
