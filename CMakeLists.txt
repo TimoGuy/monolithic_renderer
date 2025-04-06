@@ -43,7 +43,7 @@ add_library(${PROJECT_NAME}
     ${CMAKE_CURRENT_SOURCE_DIR}/src/fastgltf_support__cglm_element_traits.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/geo_instance.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/geo_instance.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/geo_render_pass.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/geo_render_pass.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gltf_loader.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gltf_loader.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/imgui_system.cpp
