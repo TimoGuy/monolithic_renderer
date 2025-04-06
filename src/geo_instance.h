@@ -5,6 +5,7 @@
 #include <utility>  // For `std::pair`.
 #include <vector>
 #include "cglm/cglm.h"
+#include "geo_render_pass.h"
 #include "gltf_loader.h"
 #include "gpu_geo_data.h"
 #include "renderer_win64_vk_buffer.h"
@@ -14,14 +15,6 @@ namespace world_sim { class Transform_read_ifc; }
 namespace geo_instance
 {
 
-enum class Geo_render_pass : uint8_t
-{
-    OPAQUE = 0,
-    WATER_TRANSPARENT,
-    TRANSPARENT,
-    NUM_GEO_RENDER_PASSES
-};
-
 struct Geo_instance
 {
     uint32_t model_idx{ (uint32_t)-1 };
@@ -29,15 +22,18 @@ struct Geo_instance
     // @NOTE: WATER_TRANSPARENT is never a shadow caster.
     bool is_shadow_caster{ true };
 
+    // Transform reader handle.
+    // @NOTE: If nullptr, then this geo instance will not pull from a transform holder.
+    // @TODO: @THEA: I feel like at a certain point, when there's not a transform
+    //   reader handle there should definitely be a lock or a something for making
+    //   sure that the changed data is visible.
+    world_sim::Transform_read_ifc* transform_reader_handle{ nullptr };
+
     // Position in instance buffer where this instance
     // is uploaded on the GPU.
     uint32_t cooked_buffer_instance_id;
 
     gpu_geo_data::GPU_geo_instance_data gpu_instance_data;
-
-    // Transform reader handle.
-    // @NOTE: If nullptr, then this geo instance will not pull from a transform holder.
-    Transform_read_ifc* transform_reader_handle{ nullptr };
 };
 
 // Primitive w/ corresponding ptr to instance.

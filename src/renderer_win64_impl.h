@@ -89,6 +89,16 @@ public:
         return m_finished_shutdown;
     }
 
+    // Render geometry objects.
+    render_geo_obj_key_t create_render_geo_obj(const std::string& model_name,
+                                               const std::string& material_set_name,
+                                               geo_instance::Geo_render_pass render_pass,
+                                               bool is_shadow_caster,
+                                               phys_obj::Transform_holder* transform_holder);
+    void destroy_render_geo_obj(render_geo_obj_key_t key);
+    void set_render_geo_obj_transform(render_geo_obj_key_t key,
+                                      mat4 transform);
+
     // Jobs.
     inline static const uint32_t k_glfw_window_job_key{ 0xB00B1E55 };
 

@@ -395,36 +395,6 @@ int32_t Monolithic_renderer::Impl::Load_assets_job::execute()
                                       m_pimpl.m_v_vma_allocator);
     TIMING_REPORT_END_AND_PRINT(upload_combined_mesh, "Load All Models and Upload Combined Mesh: ");
 
-    assert(false);  // @TODO: CREATE A WAY TO REGISTER GEO INSTANCES FROM THE GAME ENGINE!!!!
-                    //   So to get the engine connected to the renderer, there needs to be a way to create a geo instance with a transform reader. there is a connection to it and it's getting used now but there needs to be a way to actually create these connections in engine.cpp  -Thea 2025/04/04
-
-    // @DEBUG: @NOCHECKIN: create some instances (for testing). //
-    geo_instance::register_geo_instance(geo_instance::Geo_instance{
-        .model_idx = 0,  // @TODO: figure out way to string lookup models.
-        .render_pass = geo_instance::Geo_render_pass::OPAQUE,
-        .is_shadow_caster = true,
-        .gpu_instance_data{
-            .material_param_set_idx = material_bank::get_mat_set_idx_from_name("slime_girl_mat_set_0")
-        },
-    });
-    geo_instance::register_geo_instance(geo_instance::Geo_instance{
-        .model_idx = 1,  // @TODO: figure out way to string lookup models.
-        .render_pass = geo_instance::Geo_render_pass::OPAQUE,
-        .is_shadow_caster = true,
-        .gpu_instance_data{
-            .material_param_set_idx = material_bank::get_mat_set_idx_from_name("enemy_wip_mat_set_0")
-        },
-    });
-    geo_instance::register_geo_instance(geo_instance::Geo_instance{
-        .model_idx = 2,  // @TODO: figure out way to string lookup models.
-        .render_pass = geo_instance::Geo_render_pass::OPAQUE,
-        .is_shadow_caster = true,
-        .gpu_instance_data{
-            .material_param_set_idx = material_bank::get_mat_set_idx_from_name("box_mat_set_0")
-        },
-    });
-    //////////////////////////////////////////////////////////////
-
     // Upload material param indices and material sets.
     TIMING_REPORT_START(upload_material_sets);
     vk_buffer::upload_material_param_sets_to_gpu(m_pimpl.m_v_geo_passes_resource_buffer,
@@ -445,7 +415,6 @@ int32_t Monolithic_renderer::Impl::Load_assets_job::execute()
         m_pimpl.m_v_vma_allocator,
         m_pimpl.m_v_descriptor_alloc);
     TIMING_REPORT_END_AND_PRINT(upload_material_param_datas, "Upload Material Param Datas for Pipeline: ");
-
 
     // Upload bounding sphere data.
     TIMING_REPORT_START(upload_bs);
@@ -476,6 +445,39 @@ int32_t Monolithic_renderer::Impl::Load_assets_job::execute()
             << "  " << blocks << " blocks (" << blocks_mb << " MB)" << std::endl
             << "  " << usage_mb << " MB usage / " << budget_mb << " MB budget" << std::endl;
     }
+
+    /////////////////////////////////////////////////////
+
+    assert(false);  // @TODO: CREATE A WAY TO REGISTER GEO INSTANCES FROM THE GAME ENGINE!!!!
+                    //   So to get the engine connected to the renderer, there needs to be a way to create a geo instance with a transform reader. there is a connection to it and it's getting used now but there needs to be a way to actually create these connections in engine.cpp  -Thea 2025/04/04
+
+    // @DEBUG: @NOCHECKIN: create some instances (for testing). //
+    geo_instance::register_geo_instance(geo_instance::Geo_instance{
+        .model_idx = 0,  // @TODO: figure out way to string lookup models.
+        .render_pass = geo_instance::Geo_render_pass::OPAQUE,
+        .is_shadow_caster = true,
+        .gpu_instance_data{
+            .material_param_set_idx = material_bank::get_mat_set_idx_from_name("slime_girl_mat_set_0")
+        },
+    });
+    geo_instance::register_geo_instance(geo_instance::Geo_instance{
+        .model_idx = 1,  // @TODO: figure out way to string lookup models.
+        .render_pass = geo_instance::Geo_render_pass::OPAQUE,
+        .is_shadow_caster = true,
+        .gpu_instance_data{
+            .material_param_set_idx = material_bank::get_mat_set_idx_from_name("enemy_wip_mat_set_0")
+        },
+    });
+    geo_instance::register_geo_instance(geo_instance::Geo_instance{
+        .model_idx = 2,  // @TODO: figure out way to string lookup models.
+        .render_pass = geo_instance::Geo_render_pass::OPAQUE,
+        .is_shadow_caster = true,
+        .gpu_instance_data{
+            .material_param_set_idx = material_bank::get_mat_set_idx_from_name("box_mat_set_0")
+        },
+    });
+    //////////////////////////////////////////////////////////////
+
     return 0;
 }
 

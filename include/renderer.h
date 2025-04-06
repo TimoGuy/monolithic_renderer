@@ -3,7 +3,10 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include "cglm/cglm.h"
+#include "geo_render_pass.h"
 #include "multithreaded_job_system_public.h"
+namespace phys_obj { class Transform_holder; }
 
 
 class Monolithic_renderer : public Job_source
@@ -23,6 +26,17 @@ public:
 #if _WIN64
     void notify_windowevent_uniconification();
 #endif  // _WIN64
+
+    // Render geometry objects.
+    using render_geo_obj_key_t = uint64_t;
+    render_geo_obj_key_t create_render_geo_obj(const std::string& model_name,
+                                               const std::string& material_set_name,
+                                               geo_instance::Geo_render_pass render_pass,
+                                               bool is_shadow_caster,
+                                               phys_obj::Transform_holder* transform_holder);
+    void destroy_render_geo_obj(render_geo_obj_key_t key);
+    void set_render_geo_obj_transform(render_geo_obj_key_t key,
+                                      mat4 transform);
 
     class Impl;
 

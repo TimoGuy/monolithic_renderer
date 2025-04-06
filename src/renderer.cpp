@@ -60,6 +60,33 @@ void Monolithic_renderer::notify_windowevent_uniconification()
 }
 #endif  // _WIN64
 
+// Render geometry objects.
+Monolithic_renderer::render_geo_obj_key_t Monolithic_renderer::create_render_geo_obj(
+    const std::string& model_name,
+    const std::string& material_set_name,
+    geo_instance::Geo_render_pass render_pass,
+    bool is_shadow_caster,
+    phys_obj::Transform_holder* transform_holder)
+{
+    return m_pimpl->create_render_geo_obj(model_name,
+                                          material_set_name,
+                                          render_pass,
+                                          is_shadow_caster,
+                                          transform_holder);
+}
+
+void Monolithic_renderer::destroy_render_geo_obj(render_geo_obj_key_t key)
+{
+    m_pimpl->destroy_render_geo_obj(key);
+}
+
+void Monolithic_renderer::set_render_geo_obj_transform(render_geo_obj_key_t key,
+                                                       mat4 transform)
+{
+    m_pimpl->set_render_geo_obj_transform(key, transform);
+}
+
+// Fetch next jobs.
 Job_source::Job_next_jobs_return_data Monolithic_renderer::fetch_next_jobs_callback()
 {
     return m_pimpl->fetch_next_jobs_callback();
