@@ -125,20 +125,29 @@ Monolithic_renderer::Impl::create_render_geo_obj(const std::string& model_name,
                                                  bool is_shadow_caster,
                                                  phys_obj::Transform_holder* transform_holder)
 {
-    // @TODO: Figure out when this gets called!!!!
-    assert(false);
-    return 0;
+    assert(false);  // @TODO: @INCOMPLETE: This needs to happen as a register change request.
+    return geo_instance::register_geo_instance(geo_instance::Geo_instance{
+        .model_idx = 0,  // @TODO: figure out way to string lookup models.
+        .render_pass = render_pass,
+        .is_shadow_caster = is_shadow_caster,
+        .transform_reader_handle = transform_holder,
+        .gpu_instance_data{
+            .material_param_set_idx = material_bank::get_mat_set_idx_from_name(material_set_name)
+        },
+    });
 }
 
 void Monolithic_renderer::Impl::destroy_render_geo_obj(render_geo_obj_key_t key)
 {
-    assert(false);
+    assert(false);  // @TODO: @INCOMPLETE: This needs to happen as an unregister change request.
+    geo_instance::unregister_geo_instance(key);
 }
 
 void Monolithic_renderer::Impl::set_render_geo_obj_transform(render_geo_obj_key_t key,
                                                              mat4 transform)
 {
-    assert(false);
+    assert(false);  // @TODO: @INCOMPLETE: This needs to happen as a set transform change request.
+    geo_instance::set_geo_instance_transform(key, transform);
 }
 
 // Jobs.
