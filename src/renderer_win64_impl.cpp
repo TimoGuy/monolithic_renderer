@@ -93,13 +93,15 @@ static void window_iconify_callback(GLFWwindow* window,
 // For extern symbol.
 std::atomic<Monolithic_renderer*> s_mr_singleton_ptr{ nullptr };
 
-Monolithic_renderer::Impl::Impl(const std::string& name,
+Monolithic_renderer::Impl::Impl(std::atomic_size_t& num_job_sources_setup_incomplete,
+                                const std::string& name,
                                 int32_t content_width,
                                 int32_t content_height,
                                 int32_t fallback_content_width,
                                 int32_t fallback_content_height,
                                 Job_source& source)
-    : m_name(name)
+    : m_num_job_sources_setup_incomplete(num_job_sources_setup_incomplete)
+    , m_name(name)
     , m_window_width(content_width)
     , m_window_height(content_height)
     , m_fallback_window_width(fallback_content_width)
@@ -470,6 +472,7 @@ int32_t Monolithic_renderer::Impl::Load_assets_job::execute()
             << "  " << usage_mb << " MB usage / " << budget_mb << " MB budget" << std::endl;
     }
 
+#if 0
     /////////////////////////////////////////////////////
 
     assert(false);  // @TODO: CREATE A WAY TO REGISTER GEO INSTANCES FROM THE GAME ENGINE!!!!
@@ -501,6 +504,7 @@ int32_t Monolithic_renderer::Impl::Load_assets_job::execute()
         },
     });
     //////////////////////////////////////////////////////////////
+#endif  // 0
 
     return 0;
 }
@@ -571,8 +575,28 @@ Job_source::Job_next_jobs_return_data Monolithic_renderer::Impl::fetch_next_jobs
             return_data.jobs = {
                 m_load_assets_job.get(),
             };
-            m_stage = Stage::UPDATE_DATA;
+            m_stage = Stage::WAIT_FOR_GLOBAL_SETUP_COMPLETION;
             break;
+
+        case Stage::WAIT_FOR_GLOBAL_SETUP_COMPLETION:
+        {
+            // Mark setup as complete here by decrementing global counter.
+            // When this counter reaches 0, then that means that all the job sources are
+            // finished with their individual setups.
+            // @INCOMPLETE: Create a better system.
+            static std::atomic_bool s_mark_executed{ false };
+            bool executed_expect{ false };
+            if (s_mark_executed.compare_exchange_strong(executed_expect, true))
+            {
+                m_num_job_sources_setup_incomplete--;
+            }
+
+            if (m_num_job_sources_setup_incomplete == 0)
+            {
+                m_stage = Stage::UPDATE_DATA;
+            }
+            break;
+        }
 
         case Stage::UPDATE_DATA:
             return_data.jobs = {

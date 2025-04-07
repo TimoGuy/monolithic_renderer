@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <functional>
 #include <memory>
 #include <string>
@@ -12,7 +13,8 @@ namespace phys_obj { class Transform_holder; }
 class Monolithic_renderer : public Job_source
 {
 public:
-    Monolithic_renderer(const std::string& name,
+    Monolithic_renderer(std::atomic_size_t& num_job_sources_setup_incomplete,
+                        const std::string& name,
                         int32_t content_width,
                         int32_t content_height,
                         int32_t fallback_content_width,

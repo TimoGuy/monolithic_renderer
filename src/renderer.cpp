@@ -13,12 +13,14 @@ extern std::atomic<Monolithic_renderer*> s_mr_singleton_ptr;
 
 // Implementation wrapper.
 Monolithic_renderer::Monolithic_renderer(
+    std::atomic_size_t& num_job_sources_setup_incomplete,
     const std::string& name,
     int32_t content_width,
     int32_t content_height,
     int32_t fallback_content_width,
     int32_t fallback_content_height)
-    : m_pimpl(std::make_unique<Impl>(name,
+    : m_pimpl(std::make_unique<Impl>(num_job_sources_setup_incomplete,
+                                     name,
                                      content_width,
                                      content_height,
                                      fallback_content_width,

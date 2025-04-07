@@ -48,7 +48,8 @@ extern std::atomic<Monolithic_renderer*> s_mr_singleton_ptr;
 class Monolithic_renderer::Impl
 {
 public:
-    Impl(const std::string& name,
+    Impl(std::atomic_size_t& num_job_sources_setup_incomplete,
+         const std::string& name,
          int32_t content_width,
          int32_t content_height,
          int32_t fallback_content_width,
@@ -60,6 +61,7 @@ public:
         BUILD_WINDOW = 0,
         BUILD,
         LOAD_ASSETS,
+        WAIT_FOR_GLOBAL_SETUP_COMPLETION,
         UPDATE_DATA,
         RENDER,
         TEARDOWN,
@@ -250,6 +252,7 @@ private:
     bool update_and_upload_render_data();
     bool render();
 
+    std::atomic_size_t& m_num_job_sources_setup_incomplete;
     std::string m_name;
     int32_t m_window_width;
     int32_t m_window_height;
