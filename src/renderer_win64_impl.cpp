@@ -126,6 +126,7 @@ Monolithic_renderer::Impl::create_render_geo_obj(const std::string& model_name,
                                                  phys_obj::Transform_holder* transform_holder)
 {
     assert(false);  // @TODO: @INCOMPLETE: This needs to happen as a register change request.
+    // @CHECK: I think that it's actually possible to do a register anytime and then the data gets picked up at the next pickup but I'll have to check on that.  -Thea 2025/04/07
     return geo_instance::register_geo_instance(geo_instance::Geo_instance{
         .model_idx = 0,  // @TODO: figure out way to string lookup models.
         .render_pass = render_pass,
