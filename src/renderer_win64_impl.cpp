@@ -115,6 +115,30 @@ Monolithic_renderer::Impl::Impl(const std::string& name,
 {
 }
 
+// Render geometry object lifetime.
+Monolithic_renderer::render_geo_obj_key_t
+Monolithic_renderer::Impl::create_render_geo_obj(const std::string& model_name,
+                                                 const std::string& material_set_name,
+                                                 geo_instance::Geo_render_pass render_pass,
+                                                 bool is_shadow_caster,
+                                                 phys_obj::Transform_holder* transform_holder)
+{
+    // @TODO: Figure out when this gets called!!!!
+    assert(false);
+    return 0;
+}
+
+void Monolithic_renderer::Impl::destroy_render_geo_obj(render_geo_obj_key_t key)
+{
+    assert(false);
+}
+
+void Monolithic_renderer::Impl::set_render_geo_obj_transform(render_geo_obj_key_t key,
+                                                             mat4 transform)
+{
+    assert(false);
+}
+
 // Jobs.
 int32_t Monolithic_renderer::Impl::Build_window_job::execute()
 {

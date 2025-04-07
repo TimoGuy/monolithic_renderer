@@ -524,7 +524,7 @@ void vk_buffer::upload_changed_per_frame_data(const vk_util::Immediate_submit_su
             if (inst->transform_reader_handle != nullptr)
             {
                 inst->transform_reader_handle->read_current_transform(
-                    inst->gpu_instance_data.transform);
+                    inst->gpu_instance_data.transform, 0.5f);  // @HARDCODE
             }
 
             memcpy(data,

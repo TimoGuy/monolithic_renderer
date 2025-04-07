@@ -89,7 +89,7 @@ public:
         return m_finished_shutdown;
     }
 
-    // Render geometry objects.
+    // Render geometry object lifetime.
     render_geo_obj_key_t create_render_geo_obj(const std::string& model_name,
                                                const std::string& material_set_name,
                                                geo_instance::Geo_render_pass render_pass,
