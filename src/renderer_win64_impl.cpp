@@ -1869,7 +1869,7 @@ void render__run_camera_view_geometry_culling(VkCommandBuffer cmd,
                                               VkDeviceSize visible_result_data_buffer_size,
                                               uint32_t graphics_queue_family_idx)
 {
-    assert(params.num_instances > 0);  // @TODO: Add in just clearing and no drawing if nothing to render.
+    assert(params.num_instances > 0);
 
     // @NOTE: Visibility is calculated at a per-instance level here.
     vkCmdBindPipeline(cmd,
@@ -1932,7 +1932,7 @@ void render__run_write_camera_view_geometry_draw_cmds(
     //        its own thing so that the resulting buffer can be reused
     //        for other rendering steps.
 
-    assert(num_primitive_render_groups > 0);  // @TODO: Add in just clearing and no drawing if nothing to render.
+    assert(num_primitive_render_groups > 0);
 
     // Reset count buffer to 0.
     vkCmdFillBuffer(cmd,
@@ -2286,8 +2286,6 @@ bool Monolithic_renderer::Impl::render()
         vmaMapMemory(m_v_vma_allocator, current_frame.camera_buffer.allocation, &data);
         memcpy(data, &camera_data, sizeof(camera::GPU_camera));
         vmaUnmapMemory(m_v_vma_allocator, current_frame.camera_buffer.allocation);
-        
-        //assert(false);  // @TODO: START HERE!!!! FIGURE OUT THE GLFW POLLING ISSUE STUFF.
 
         // @THOUGHT: So it looks like the GLFW polling thing doesn't affect the actual
         //   rendering. I think the below vv is very very smooth. Unfortunately, Imgui
@@ -2329,71 +2327,76 @@ bool Monolithic_renderer::Impl::render()
                                   m_v_HDR_draw_image.image.image,
                                   VK_IMAGE_LAYOUT_GENERAL,
                                   VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-        render__run_sunlight_shadow_cascades_pass();
 
-        auto& current_per_frame_data{ get_current_geom_per_frame_data() };
+        uint32_t unique_instances_count{ geo_instance::get_unique_instances_count() };
+        if (unique_instances_count > 0)
+        {
+            render__run_sunlight_shadow_cascades_pass();
 
-        constexpr bool k_culling_enabled{ true };
+            auto& current_per_frame_data{ get_current_geom_per_frame_data() };
 
-        const auto& current_geo_frame{ current_frame.geo_per_frame_buffer };
+            constexpr bool k_culling_enabled{ true };
 
-        GPU_geometry_culling_push_constants geom_culling_pc{
-            .z_near = 0.0f,  // @TODO: Calculate frustum!
-            .z_far = 0.0f,
-            .frustum_x_x = 0.0f,
-            .frustum_x_z = 0.0f,
-            .frustum_y_y = 0.0f,
-            .frustum_y_z = 0.0f,
-            .culling_enabled = (k_culling_enabled ? 1 : 0),
-            .num_instances = geo_instance::get_unique_instances_count(),
-            .instance_buffer_address = current_geo_frame.instance_data_buffer_address,
-            .visible_result_buffer_address = current_geo_frame.visible_result_buffer_address,
-        };
+            const auto& current_geo_frame{ current_frame.geo_per_frame_buffer };
 
-        render__run_camera_view_geometry_culling(
-            cmd,
-            current_per_frame_data.camera_data.descriptor_set,
-            m_v_geometry_graphics_pass.bounding_spheres_data.descriptor_set,
-            geom_culling_pc,
-            m_v_geometry_graphics_pass.culling_pipeline,
-            m_v_geometry_graphics_pass.culling_pipeline_layout,
-            current_geo_frame.visible_result_buffer.buffer,
-            sizeof(uint32_t) * current_geo_frame.num_visible_result_elems,
-            m_v_graphics_queue_family_idx);
+            GPU_geometry_culling_push_constants geom_culling_pc{
+                .z_near = 0.0f,  // @TODO: Calculate frustum!
+                .z_far = 0.0f,
+                .frustum_x_x = 0.0f,
+                .frustum_x_z = 0.0f,
+                .frustum_y_y = 0.0f,
+                .frustum_y_z = 0.0f,
+                .culling_enabled = (k_culling_enabled ? 1 : 0),
+                .num_instances = unique_instances_count,
+                .instance_buffer_address = current_geo_frame.instance_data_buffer_address,
+                .visible_result_buffer_address = current_geo_frame.visible_result_buffer_address,
+            };
 
-        GPU_write_draw_cmds_push_constants write_draw_cmds_pc{
-            .num_primitives =
-                geo_instance::get_number_primitives(geo_instance::Geo_render_pass::OPAQUE),
-            .visible_result_buffer_address = current_geo_frame.visible_result_buffer_address,
-            .base_indices_buffer_address = current_geo_frame.primitive_group_base_index_buffer_address,
-            .count_buffer_indices_buffer_address = current_geo_frame.count_buffer_index_buffer_address,
-            .draw_commands_input_buffer_address = current_geo_frame.indirect_command_buffer_address,
-            .draw_commands_output_buffer_address = current_geo_frame.culled_indirect_command_buffer_address,
-            .draw_command_counts_buffer_address = current_geo_frame.indirect_counts_buffer_address,
-        };
+            render__run_camera_view_geometry_culling(
+                cmd,
+                current_per_frame_data.camera_data.descriptor_set,
+                m_v_geometry_graphics_pass.bounding_spheres_data.descriptor_set,
+                geom_culling_pc,
+                m_v_geometry_graphics_pass.culling_pipeline,
+                m_v_geometry_graphics_pass.culling_pipeline_layout,
+                current_geo_frame.visible_result_buffer.buffer,
+                sizeof(uint32_t) * current_geo_frame.num_visible_result_elems,
+                m_v_graphics_queue_family_idx);
 
-        // @NOTE: this writes draw cmds for just opaque geo pass.
-        render__run_write_camera_view_geometry_draw_cmds(cmd,
-                                                         write_draw_cmds_pc,
-                                                         geo_instance::get_num_primitive_render_groups(
-                                                            geo_instance::Geo_render_pass::OPAQUE),
-                                                         m_v_geometry_graphics_pass.write_draw_cmds_pipeline,
-                                                         m_v_geometry_graphics_pass.write_draw_cmds_pipeline_layout,
-                                                         current_geo_frame.culled_indirect_command_buffer.buffer,
-                                                         current_geo_frame.indirect_counts_buffer.buffer,
-                                                         m_v_graphics_queue_family_idx);
-        render__run_opaque_geometry_pass(cmd,
-                                         m_v_HDR_draw_image.image.image_view,
-                                         m_v_HDR_draw_image.extent,
-                                         current_per_frame_data.camera_data.descriptor_set,
-                                         current_geo_frame.instance_data_buffer_address,
-                                         current_geo_frame.culled_indirect_command_buffer.buffer,
-                                         current_geo_frame.indirect_counts_buffer.buffer);
+            GPU_write_draw_cmds_push_constants write_draw_cmds_pc{
+                .num_primitives =
+                    geo_instance::get_number_primitives(geo_instance::Geo_render_pass::OPAQUE),
+                .visible_result_buffer_address = current_geo_frame.visible_result_buffer_address,
+                .base_indices_buffer_address = current_geo_frame.primitive_group_base_index_buffer_address,
+                .count_buffer_indices_buffer_address = current_geo_frame.count_buffer_index_buffer_address,
+                .draw_commands_input_buffer_address = current_geo_frame.indirect_command_buffer_address,
+                .draw_commands_output_buffer_address = current_geo_frame.culled_indirect_command_buffer_address,
+                .draw_command_counts_buffer_address = current_geo_frame.indirect_counts_buffer_address,
+            };
 
-        // render__run_sample_geometry_pass(cmd,
-        //                                  m_v_HDR_draw_image.image.image_view,
-        //                                  m_v_HDR_draw_image.extent,
-        //                                  m_v_sample_graphics_pass.pipeline);
+            // @NOTE: this writes draw cmds for just opaque geo pass.
+            render__run_write_camera_view_geometry_draw_cmds(cmd,
+                                                             write_draw_cmds_pc,
+                                                             geo_instance::get_num_primitive_render_groups(
+                                                                 geo_instance::Geo_render_pass::OPAQUE),
+                                                             m_v_geometry_graphics_pass.write_draw_cmds_pipeline,
+                                                             m_v_geometry_graphics_pass.write_draw_cmds_pipeline_layout,
+                                                             current_geo_frame.culled_indirect_command_buffer.buffer,
+                                                             current_geo_frame.indirect_counts_buffer.buffer,
+                                                             m_v_graphics_queue_family_idx);
+            render__run_opaque_geometry_pass(cmd,
+                                             m_v_HDR_draw_image.image.image_view,
+                                             m_v_HDR_draw_image.extent,
+                                             current_per_frame_data.camera_data.descriptor_set,
+                                             current_geo_frame.instance_data_buffer_address,
+                                             current_geo_frame.culled_indirect_command_buffer.buffer,
+                                             current_geo_frame.indirect_counts_buffer.buffer);
+
+            // render__run_sample_geometry_pass(cmd,
+            //                                  m_v_HDR_draw_image.image.image_view,
+            //                                  m_v_HDR_draw_image.extent,
+            //                                  m_v_sample_graphics_pass.pipeline);
+        }
 
         // Swapchain.
         render__blit_HDR_image_to_swapchain(cmd,
