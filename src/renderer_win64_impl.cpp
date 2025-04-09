@@ -131,7 +131,7 @@ Monolithic_renderer::Impl::create_render_geo_obj(const std::string& model_name,
         .model_idx = 0,  // @TODO: figure out way to string lookup models.
         .render_pass = render_pass,
         .is_shadow_caster = is_shadow_caster,
-        .transform_reader_handle = transform_holder,
+        .transform_reader_handle = static_cast<world_sim::Transform_read_ifc*>(transform_holder),  // @THEA: @TODO: Why doesn't this workkkkoooo????
         .gpu_instance_data{
             .material_param_set_idx = material_bank::get_mat_set_idx_from_name(material_set_name)
         },
