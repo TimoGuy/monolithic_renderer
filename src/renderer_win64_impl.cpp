@@ -22,6 +22,7 @@
 #include "renderer_win64_vk_pipeline_builder.h"
 #include "renderer_win64_vk_util.h"
 #include "timing_reporter_public.h"
+#include "ticking_world_simulation_public.h"
 
 
 // Callbacks for input.
@@ -125,13 +126,14 @@ Monolithic_renderer::Impl::create_render_geo_obj(const std::string& model_name,
                                                  bool is_shadow_caster,
                                                  phys_obj::Transform_holder* transform_holder)
 {
-    assert(false);  // @TODO: @INCOMPLETE: This needs to happen as a register change request.
+    assert(m_all_assets_loaded);
+
     // @CHECK: I think that it's actually possible to do a register anytime and then the data gets picked up at the next pickup but I'll have to check on that.  -Thea 2025/04/07
     return geo_instance::register_geo_instance(geo_instance::Geo_instance{
         .model_idx = 0,  // @TODO: figure out way to string lookup models.
         .render_pass = render_pass,
         .is_shadow_caster = is_shadow_caster,
-        .transform_reader_handle = static_cast<world_sim::Transform_read_ifc*>(transform_holder),  // @THEA: @TODO: Why doesn't this workkkkoooo????
+        .transform_reader_handle = transform_holder,  // @THEA: @TODO: Why doesn't this workkkkoooo????
         .gpu_instance_data{
             .material_param_set_idx = material_bank::get_mat_set_idx_from_name(material_set_name)
         },
@@ -140,14 +142,14 @@ Monolithic_renderer::Impl::create_render_geo_obj(const std::string& model_name,
 
 void Monolithic_renderer::Impl::destroy_render_geo_obj(render_geo_obj_key_t key)
 {
-    assert(false);  // @TODO: @INCOMPLETE: This needs to happen as an unregister change request.
+    assert(m_all_assets_loaded);
     geo_instance::unregister_geo_instance(key);
 }
 
 void Monolithic_renderer::Impl::set_render_geo_obj_transform(render_geo_obj_key_t key,
                                                              mat4 transform)
 {
-    assert(false);  // @TODO: @INCOMPLETE: This needs to happen as a set transform change request.
+    assert(m_all_assets_loaded);
     geo_instance::set_geo_instance_transform(key, transform);
 }
 
@@ -475,12 +477,14 @@ int32_t Monolithic_renderer::Impl::Load_assets_job::execute()
         float_t usage_mb{ budgets[i].usage / 1024.0f / 1024.0f };
         float_t budget_mb{ budgets[i].budget / 1024.0f / 1024.0f };
         std::cout
-            << (i == 0 ? "-=-=- GPU Memory Report -=-=-" : "") << std::endl
-            << "# Memory Heap " << i << std::endl
-            << "  " << allocs << " allocations (" << allocs_mb << " MB)" << std::endl
-            << "  " << blocks << " blocks (" << blocks_mb << " MB)" << std::endl
+            << (i == 0 ? "-=-=- GPU Memory Report -=-=-" : "")                 << std::endl
+            << "# Memory Heap " << i                                           << std::endl
+            << "  " << allocs << " allocations (" << allocs_mb << " MB)"       << std::endl
+            << "  " << blocks << " blocks (" << blocks_mb << " MB)"            << std::endl
             << "  " << usage_mb << " MB usage / " << budget_mb << " MB budget" << std::endl;
     }
+
+    m_pimpl.m_all_assets_loaded = true;
 
 #if 0
     /////////////////////////////////////////////////////

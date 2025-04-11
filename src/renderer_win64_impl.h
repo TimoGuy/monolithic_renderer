@@ -297,6 +297,8 @@ private:
     vk_buffer::GPU_geo_resource_buffer m_v_geo_passes_resource_buffer;
     Geometry_graphics_pass m_v_geometry_graphics_pass;
 
+    std::atomic_size_t m_all_assets_loaded{ false };
+
     inline Geometry_graphics_pass::Per_frame_data& get_current_geom_per_frame_data()
     {
         return m_v_geometry_graphics_pass
