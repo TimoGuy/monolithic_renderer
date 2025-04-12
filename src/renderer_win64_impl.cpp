@@ -22,7 +22,6 @@
 #include "renderer_win64_vk_pipeline_builder.h"
 #include "renderer_win64_vk_util.h"
 #include "timing_reporter_public.h"
-#include "ticking_world_simulation_public.h"
 
 
 // Callbacks for input.
@@ -124,7 +123,7 @@ Monolithic_renderer::Impl::create_render_geo_obj(const std::string& model_name,
                                                  const std::string& material_set_name,
                                                  geo_instance::Geo_render_pass render_pass,
                                                  bool is_shadow_caster,
-                                                 phys_obj::Transform_holder* transform_holder)
+                                                 world_sim::Transform_read_ifc* transform_reader)
 {
     assert(m_all_assets_loaded);
 
@@ -133,7 +132,7 @@ Monolithic_renderer::Impl::create_render_geo_obj(const std::string& model_name,
         .model_idx = 0,  // @TODO: figure out way to string lookup models.
         .render_pass = render_pass,
         .is_shadow_caster = is_shadow_caster,
-        .transform_reader_handle = transform_holder,  // @THEA: @TODO: Why doesn't this workkkkoooo????
+        .transform_reader_handle = transform_reader,
         .gpu_instance_data{
             .material_param_set_idx = material_bank::get_mat_set_idx_from_name(material_set_name)
         },

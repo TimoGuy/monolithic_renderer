@@ -96,7 +96,7 @@ public:
                                                const std::string& material_set_name,
                                                geo_instance::Geo_render_pass render_pass,
                                                bool is_shadow_caster,
-                                               phys_obj::Transform_holder* transform_holder);
+                                               world_sim::Transform_read_ifc* transform_reader);
     void destroy_render_geo_obj(render_geo_obj_key_t key);
     void set_render_geo_obj_transform(render_geo_obj_key_t key,
                                       mat4 transform);

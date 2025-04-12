@@ -134,6 +134,19 @@ void geo_instance::unregister_geo_instance(Geo_instance_key_t key)
     s_flag_rebucketing = true;
 }
 
+void geo_instance::set_geo_instance_transform(Geo_instance_key_t key, mat4 transform)
+{
+    assert(key < k_num_instances);
+
+    // Set geo instance transform.
+    auto instance_pool{ s_instance_pool.access() };
+    assert(instance_pool.m_data.pool[key].is_reserved);
+
+    glm_mat4_copy(
+        transform,
+        instance_pool.m_data.pool[key].geo_instance.gpu_instance_data.transform);
+}
+
 void geo_instance::rebuild_bucketed_instance_list_array(std::vector<vk_buffer::GPU_geo_per_frame_buffer*>& all_per_frame_buffers)
 {
     if (!s_flag_rebucketing)

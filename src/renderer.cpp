@@ -68,13 +68,13 @@ Monolithic_renderer::render_geo_obj_key_t Monolithic_renderer::create_render_geo
     const std::string& material_set_name,
     geo_instance::Geo_render_pass render_pass,
     bool is_shadow_caster,
-    phys_obj::Transform_holder* transform_holder)
+    world_sim::Transform_read_ifc* transform_reader)
 {
     return m_pimpl->create_render_geo_obj(model_name,
                                           material_set_name,
                                           render_pass,
                                           is_shadow_caster,
-                                          transform_holder);
+                                          transform_reader);
 }
 
 void Monolithic_renderer::destroy_render_geo_obj(render_geo_obj_key_t key)
