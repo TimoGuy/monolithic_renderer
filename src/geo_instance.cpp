@@ -112,7 +112,7 @@ geo_instance::Geo_instance_key_t geo_instance::register_geo_instance(Geo_instanc
     s_flag_rebucketing = true;
 
     // No more room for registering geo instance.
-    assert(new_instance_idx == (Geo_instance_key_t)-1);
+    assert(new_instance_idx != (Geo_instance_key_t)-1);
 
     return new_instance_idx;
 }

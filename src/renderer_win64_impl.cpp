@@ -2299,21 +2299,6 @@ bool Monolithic_renderer::Impl::render()
         vmaMapMemory(m_v_vma_allocator, current_frame.camera_buffer.allocation, &data);
         memcpy(data, &camera_data, sizeof(camera::GPU_camera));
         vmaUnmapMemory(m_v_vma_allocator, current_frame.camera_buffer.allocation);
-
-        // @THOUGHT: So it looks like the GLFW polling thing doesn't affect the actual
-        //   rendering. I think the below vv is very very smooth. Unfortunately, Imgui
-        //   is really really struggling, and I suspect that the `glfwPollEvents()` call
-        //   is the culprit. It seems like if everything runs on one thread it's all good.
-        //   but, likely everything else isn't. Perhaps there needs to be a dedicated thread
-        //   for just input stuff? This seems like something that needs to be a change in the
-        //   job system, perhaps adding tags to certain jobs so that they run on the same core?
-        //     TLDR: The polling and glfw-related events need to happen on the same cpu core, bc
-        //       they're not thread safe. All rendering and stuff like that can happen on different
-        //       cores, however.  -Thea 2025/03/07 (THINK ABOUT THIS!!!!)
-        auto jojo{ camera::get_imgui_data() };
-        jojo.position[1] -= 0.01f;
-        camera::set_view_position(jojo.position);
-
     }
 
     // Render Imgui.
