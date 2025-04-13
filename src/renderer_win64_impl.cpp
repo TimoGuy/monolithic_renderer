@@ -129,7 +129,7 @@ Monolithic_renderer::Impl::create_render_geo_obj(const std::string& model_name,
 
     // @CHECK: I think that it's actually possible to do a register anytime and then the data gets picked up at the next pickup but I'll have to check on that.  -Thea 2025/04/07
     return geo_instance::register_geo_instance(geo_instance::Geo_instance{
-        .model_idx = 0,  // @TODO: figure out way to string lookup models.
+        .model_idx = gltf_loader::get_model_idx_from_name(model_name),
         .render_pass = render_pass,
         .is_shadow_caster = is_shadow_caster,
         .transform_reader_handle = transform_reader,
@@ -423,7 +423,7 @@ int32_t Monolithic_renderer::Impl::Load_assets_job::execute()
 
     // Models.
     TIMING_REPORT_START(upload_combined_mesh);
-    
+
 
     gltf_loader::load_gltf("assets/models/slime_girl.glb");  // @TODO: figure out way to string lookup models.
     gltf_loader::load_gltf("assets/models/enemy_wip.glb");
