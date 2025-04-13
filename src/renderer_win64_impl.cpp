@@ -423,6 +423,8 @@ int32_t Monolithic_renderer::Impl::Load_assets_job::execute()
 
     // Models.
     TIMING_REPORT_START(upload_combined_mesh);
+    
+
     gltf_loader::load_gltf("assets/models/slime_girl.glb");  // @TODO: figure out way to string lookup models.
     gltf_loader::load_gltf("assets/models/enemy_wip.glb");
     gltf_loader::load_gltf("assets/models/box.gltf");

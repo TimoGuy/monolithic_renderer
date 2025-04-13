@@ -4,6 +4,8 @@
 #include <filesystem>
 #include <iostream>
 #include <limits>
+#include <string>
+#include <unordered_map>
 #include <vector>
 #include "cglm/cglm.h"
 // Fast gltf includes must be in this order. //
@@ -28,6 +30,7 @@ static std::vector<Model> s_staging_models;  // Accessor into all indices.
 
 static vk_buffer::GPU_mesh_buffer s_static_mesh_buffer;  // Cooked buffer.
 static std::vector<Model> s_cooked_models;  // Accessor into all indices of cooked buffer.
+static std::unordered_map<std::string, uint32_t> s_cooked_model_name_to_model_idx_map;  // For model name string lookup.
 static std::vector<gpu_geo_data::GPU_bounding_sphere> s_cooked_bounding_spheres;
 
 // glTF 2.0 attribute strings.
@@ -73,6 +76,7 @@ bool validate_vertex_attributes(const fgltf_attributes_t& attributes)
 }
 
 }  // namespace gltf_loader
+
 
 gltf_loader::Vertex_input_description gltf_loader::GPU_vertex::get_static_vertex_description()
 {
@@ -371,6 +375,9 @@ bool gltf_loader::upload_combined_mesh(const vk_util::Immediate_submit_support& 
                                       std::move(s_staging_vertices));
     s_cooked_models = std::move(s_staging_models);
 
+    // Move model names into model name idx lookup map.
+    assert(false);  // @TODO: IMPLEMENT THIS FEATUREEEEE!!!!
+
     // Move bounding spheres into bounding sphere structs.
     s_cooked_bounding_spheres.clear();
     s_cooked_bounding_spheres.reserve(s_cooked_models.size());
@@ -410,6 +417,28 @@ bool gltf_loader::bind_combined_mesh(VkCommandBuffer cmd)
     vkCmdBindIndexBuffer(cmd, s_static_mesh_buffer.index_buffer.buffer, 0, VK_INDEX_TYPE_UINT32);
 
     return true;
+}
+
+uint32_t gltf_loader::get_model_idx_from_name(const std::string& model_name)
+{
+    if (s_indices_base_vertex != 0)  // Atomic visibility from this line.
+    {
+        // If not finished cooking models, just return -1.
+        return (uint32_t)-1;
+    }
+
+    assert(!s_cooked_models.empty());
+    assert(!s_cooked_model_name_to_model_idx_map.empty());
+
+    auto it{ s_cooked_model_name_to_model_idx_map.find(model_name) };
+    if (it == s_cooked_model_name_to_model_idx_map.end())
+    {
+        // Return invalid idx.
+        assert(false);
+        return (uint32_t)-1;
+    }
+
+    return it->second;
 }
 
 const gltf_loader::Model& gltf_loader::get_model(uint32_t idx)
