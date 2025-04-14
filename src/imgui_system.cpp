@@ -194,11 +194,84 @@ bool render_imgui__input_handling()
 
         if (ImGui::CollapsingHeader(("Set " + std::to_string(i)).c_str(), ImGuiTreeNodeFlags_DefaultOpen))
         {
-            std::string suffix{ "## input handling data set " + std::to_string(i) };
-            #define IMGUI_IS__VEC2(s, x) ImGui::InputFloat2((#x + suffix).c_str(), s.x)
-            #define IMGUI_IS_IVEC2(s, x) ImGui::InputInt2((#x + suffix).c_str(), s.x)
-            #define IMGUI_IS_FLOAT(s, x) ImGui::InputFloat((#x + suffix).c_str(), &s.x)
-            #define IMGUI_IS__BOOL(s, x) ImGui::Checkbox((#x + suffix).c_str(), &s.x)
+            constexpr uint32_t k_prefix_label_length{ sizeof("level_editor.move_world_y_axis") };
+            constexpr uint32_t k_num_numeral_chars{ 8 };  // 0.000000 -> 8 chars.
+
+            #define IMGUI_IS__VEC2(_struct, _struct_accessor)                                                          \
+            do                                                                                                         \
+            {                                                                                                          \
+                int32_t missing_prefix_amount{                                                                         \
+                    static_cast<int32_t>(k_prefix_label_length) -                                                      \
+                        static_cast<int32_t>(std::string(#_struct_accessor).size()) };                                 \
+                if (missing_prefix_amount < 0)                                                                         \
+                    missing_prefix_amount = 0;                                                                         \
+                                                                                                                       \
+                std::string prefix{ std::string(#_struct_accessor) + " : " + std::string(missing_prefix_amount, ' ') };\
+                                                                                                                       \
+                std::string v_x{ std::to_string(_struct._struct_accessor[0]) };                                        \
+                if (v_x.size() > k_num_numeral_chars)                                                                  \
+                {                                                                                                      \
+                    v_x = v_x.substr(0, k_num_numeral_chars);                                                          \
+                }                                                                                                      \
+                else if (v_x.size() < k_num_numeral_chars)                                                             \
+                {                                                                                                      \
+                    v_x += std::string(k_num_numeral_chars - v_x.size(), ' ');                                         \
+                }                                                                                                      \
+                                                                                                                       \
+                std::string v_y{ std::to_string(_struct._struct_accessor[1]) };                                        \
+                if (v_y.size() > k_num_numeral_chars)                                                                  \
+                {                                                                                                      \
+                    v_y = v_y.substr(0, k_num_numeral_chars);                                                          \
+                }                                                                                                      \
+                else if (v_y.size() < k_num_numeral_chars)                                                             \
+                {                                                                                                      \
+                    v_y += std::string(k_num_numeral_chars - v_y.size(), ' ');                                         \
+                }                                                                                                      \
+                                                                                                                       \
+                ImGui::Text((prefix + v_x + "   " + v_y).c_str());                                                     \
+            } while (0)
+
+            #define IMGUI_IS_IVEC2(_struct, _struct_accessor) IMGUI_IS__VEC2(_struct, _struct_accessor)
+
+            #define IMGUI_IS_FLOAT(_struct, _struct_accessor)                                                          \
+            do                                                                                                         \
+            {                                                                                                          \
+                int32_t missing_prefix_amount{                                                                         \
+                    static_cast<int32_t>(k_prefix_label_length) -                                                      \
+                        static_cast<int32_t>(std::string(#_struct_accessor).size()) };                                 \
+                if (missing_prefix_amount < 0)                                                                         \
+                    missing_prefix_amount = 0;                                                                         \
+                                                                                                                       \
+                std::string prefix{ std::string(#_struct_accessor) + " : " + std::string(missing_prefix_amount, ' ') };\
+                                                                                                                       \
+                std::string v_x{ std::to_string(_struct._struct_accessor) };                                           \
+                if (v_x.size() > k_num_numeral_chars)                                                                  \
+                {                                                                                                      \
+                    v_x = v_x.substr(0, k_num_numeral_chars);                                                          \
+                }                                                                                                      \
+                else if (v_x.size() < k_num_numeral_chars)                                                             \
+                {                                                                                                      \
+                    v_x += std::string(k_num_numeral_chars - v_x.size(), ' ');                                         \
+                }                                                                                                      \
+                                                                                                                       \
+                ImGui::Text((prefix + v_x).c_str());                                                                   \
+            } while (0)
+
+            #define IMGUI_IS__BOOL(_struct, _struct_accessor)                                                          \
+            do                                                                                                         \
+            {                                                                                                          \
+                int32_t missing_prefix_amount{                                                                         \
+                    static_cast<int32_t>(k_prefix_label_length) -                                                      \
+                        static_cast<int32_t>(std::string(#_struct_accessor).size()) };                                 \
+                if (missing_prefix_amount < 0)                                                                         \
+                    missing_prefix_amount = 0;                                                                         \
+                                                                                                                       \
+                std::string prefix{ std::string(#_struct_accessor) + " : " + std::string(missing_prefix_amount, ' ') };\
+                                                                                                                       \
+                std::string v_x{ _struct._struct_accessor ? "[x]" : "[ ]" };                                           \
+                                                                                                                       \
+                ImGui::Text((prefix + v_x).c_str());                                                                   \
+            } while (0)
 
             IMGUI_IS__VEC2(ih, gameplay.camera_delta);
             IMGUI_IS__VEC2(ih, gameplay.movement);
