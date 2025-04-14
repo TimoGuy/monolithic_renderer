@@ -425,9 +425,9 @@ int32_t Monolithic_renderer::Impl::Load_assets_job::execute()
     TIMING_REPORT_START(upload_combined_mesh);
 
 
-    gltf_loader::load_gltf("assets/models/slime_girl.glb");  // @TODO: figure out way to string lookup models.
-    gltf_loader::load_gltf("assets/models/enemy_wip.glb");
-    gltf_loader::load_gltf("assets/models/box.gltf");
+    gltf_loader::load_gltf("model_slime_girl", "assets/models/slime_girl.glb");  // @TODO: figure out way to string lookup models.
+    gltf_loader::load_gltf("model_enemy_wip", "assets/models/enemy_wip.glb");
+    gltf_loader::load_gltf("model_box", "assets/models/box.gltf");
     gltf_loader::upload_combined_mesh(m_pimpl.m_immediate_submit_support,
                                       m_pimpl.m_v_device,
                                       m_pimpl.m_v_graphics_queue,

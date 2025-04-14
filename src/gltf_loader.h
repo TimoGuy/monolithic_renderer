@@ -57,7 +57,7 @@ struct Model
     std::vector<Primitive> primitives;
 };
 
-bool load_gltf(const std::string& path_str);
+bool load_gltf(const std::string& model_name, const std::string& path_str);
 
 bool upload_combined_mesh(const vk_util::Immediate_submit_support& support,
                           VkDevice device,

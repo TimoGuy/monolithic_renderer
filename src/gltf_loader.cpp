@@ -27,6 +27,7 @@ static std::atomic_uint32_t s_indices_base_vertex{ 0 };
 static std::vector<uint32_t> s_staging_indices;  // Use `s_indices_base_vertex` for visibility.
 static std::vector<GPU_vertex> s_staging_vertices;  // Use `s_indices_base_vertex` for visibility.
 static std::vector<Model> s_staging_models;  // Accessor into all indices.
+static std::vector<std::string> s_staging_model_names;
 
 static vk_buffer::GPU_mesh_buffer s_static_mesh_buffer;  // Cooked buffer.
 static std::vector<Model> s_cooked_models;  // Accessor into all indices of cooked buffer.
@@ -131,7 +132,7 @@ gltf_loader::Vertex_input_description gltf_loader::GPU_vertex::get_static_vertex
     return vertex_desc;
 }
 
-bool gltf_loader::load_gltf(const std::string& path_str)
+bool gltf_loader::load_gltf(const std::string& model_name, const std::string& path_str)
 {
     std::filesystem::path path{ path_str };
     if (!std::filesystem::exists(path))
@@ -175,6 +176,9 @@ bool gltf_loader::load_gltf(const std::string& path_str)
         std::cerr << "ERROR: loading gltf had incorrect vertex attributes." << std::endl;
         assert(false);
     }
+
+    // Now that model is likely to not crash, add the model name into the staging list.
+    s_staging_model_names.emplace_back(model_name);
 
     // Emit warnings in case some material names are missing.
     for (auto& mesh : asset.meshes)
@@ -376,7 +380,11 @@ bool gltf_loader::upload_combined_mesh(const vk_util::Immediate_submit_support& 
     s_cooked_models = std::move(s_staging_models);
 
     // Move model names into model name idx lookup map.
-    assert(false);  // @TODO: IMPLEMENT THIS FEATUREEEEE!!!!
+    s_cooked_model_name_to_model_idx_map.clear();
+    for (size_t i = 0; i < s_staging_model_names.size(); i++)
+    {
+        s_cooked_model_name_to_model_idx_map.emplace(s_staging_model_names[i], i);
+    }
 
     // Move bounding spheres into bounding sphere structs.
     s_cooked_bounding_spheres.clear();
@@ -400,6 +408,7 @@ bool gltf_loader::upload_combined_mesh(const vk_util::Immediate_submit_support& 
     s_staging_indices.clear();
     s_staging_vertices.clear();
     s_staging_models.clear();
+    s_staging_model_names.clear();
 
     // Release lock on loading new gltf models.
     s_indices_base_vertex.store(0);
@@ -424,6 +433,7 @@ uint32_t gltf_loader::get_model_idx_from_name(const std::string& model_name)
     if (s_indices_base_vertex != 0)  // Atomic visibility from this line.
     {
         // If not finished cooking models, just return -1.
+        assert(false);
         return (uint32_t)-1;
     }
 
@@ -451,6 +461,7 @@ const gltf_loader::Model& gltf_loader::get_model(uint32_t idx)
     }
 
     // If not finished cooking models, just vector.
+    assert(false);
     return s_cooked_models[(size_t)-1];
 }
 
