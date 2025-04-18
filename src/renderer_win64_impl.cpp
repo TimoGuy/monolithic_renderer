@@ -109,8 +109,10 @@ Monolithic_renderer::Impl::Impl(std::atomic_size_t& num_job_sources_setup_incomp
     , m_build_window_job(std::make_unique<Build_window_job>(source, *this))
     , m_build_job(std::make_unique<Build_job>(source, *this))
     , m_load_assets_job(std::make_unique<Load_assets_job>(source, *this))
+    , m_calculate_delta_time_job(
+        std::make_unique<Calculate_delta_time_job>(source, *this))
     , m_update_poll_window_events_job(
-        std::make_unique<Update_poll_window_events_job>(source))
+        std::make_unique<Update_poll_window_events_job>(source, m_delta_time))
     , m_update_data_job(std::make_unique<Update_data_job>(source, *this))
     , m_render_job(std::make_unique<Render_job>(source, *this))
     , m_teardown_job(std::make_unique<Teardown_job>(source, *this))
@@ -424,14 +426,14 @@ int32_t Monolithic_renderer::Impl::Load_assets_job::execute()
     // Models.
     TIMING_REPORT_START(upload_combined_mesh);
 
-
-    gltf_loader::load_gltf("model_slime_girl", "assets/models/slime_girl.glb");  // @TODO: figure out way to string lookup models.
+    gltf_loader::load_gltf("model_slime_girl", "assets/models/slime_girl.glb");
     gltf_loader::load_gltf("model_enemy_wip", "assets/models/enemy_wip.glb");
     gltf_loader::load_gltf("model_box", "assets/models/box.gltf");
     gltf_loader::upload_combined_mesh(m_pimpl.m_immediate_submit_support,
                                       m_pimpl.m_v_device,
                                       m_pimpl.m_v_graphics_queue,
                                       m_pimpl.m_v_vma_allocator);
+
     TIMING_REPORT_END_AND_PRINT(upload_combined_mesh, "Load All Models and Upload Combined Mesh: ");
 
     // Upload material param indices and material sets.
@@ -524,12 +526,37 @@ int32_t Monolithic_renderer::Impl::Load_assets_job::execute()
     return 0;
 }
 
+int32_t Monolithic_renderer::Impl::Calculate_delta_time_job::execute()
+{
+    bool success{ true };
+
+    double_t current_time{ glfwGetTime() };
+
+    if (m_pimpl.m_prev_time >= 0.0)
+    {
+        // Calculate time from prev time.
+        m_pimpl.m_delta_time =
+            static_cast<float_t>(current_time - m_pimpl.m_prev_time);
+    }
+    else
+    {
+        // First time.
+        m_pimpl.m_delta_time = 0.0f;
+    }
+
+    m_pimpl.m_prev_time = current_time;
+
+    return success ? 0 : 1;
+}
+
 int32_t Monolithic_renderer::Impl::Update_poll_window_events_job::execute()
 {
     bool success{ true };
 
     glfwPollEvents();
     input_handling::end_reporting_swap_input_buffers();
+
+    camera_rig::update(m_delta_time);
 
     return success ? 0 : 1;
 }
@@ -608,10 +635,17 @@ Job_source::Job_next_jobs_return_data Monolithic_renderer::Impl::fetch_next_jobs
 
             if (m_num_job_sources_setup_incomplete == 0)
             {
-                m_stage = Stage::UPDATE_DATA;
+                m_stage = Stage::CALCULATE_DELTA_TIME;
             }
             break;
         }
+
+        case Stage::CALCULATE_DELTA_TIME:
+            return_data.jobs = {
+                m_calculate_delta_time_job.get(),
+            };
+            m_stage = Stage::UPDATE_DATA;
+            break;
 
         case Stage::UPDATE_DATA:
             return_data.jobs = {
@@ -628,7 +662,7 @@ Job_source::Job_next_jobs_return_data Monolithic_renderer::Impl::fetch_next_jobs
             // @NOTE: the render job checks if a shutdown is
             //        requested, and at that point the stage
             //        will be set to teardown instead of update.
-            m_stage = Stage::UPDATE_DATA;
+            m_stage = Stage::CALCULATE_DELTA_TIME;
             break;
 
         case Stage::TEARDOWN:
@@ -1663,13 +1697,17 @@ bool Monolithic_renderer::Impl::wait_for_renderer_idle()
 // Setup jobs.
 bool Monolithic_renderer::Impl::setup_initial_camera_props()
 {
-    camera::set_aspect_ratio(m_window_width,
-                             m_window_height);
+    camera::set_aspect_ratio(m_window_width, m_window_height);
     camera::set_fov(glm_rad(50.0f));
     camera::set_near_far(0.1f, 1000.0f);
     camera::set_view(vec3{ 0.0f, 1.0f, -5.0f },
                      glm_rad(0.0f),
                      glm_rad(-30.0f));
+
+    camera_rig::initialize(
+        camera_rig::CAMERA_RIG_TYPE_FREECAM,
+        [&](){ glfwSetInputMode(m_window, GLFW_CURSOR, GLFW_CURSOR_DISABLED); },
+        [&](){ glfwSetInputMode(m_window, GLFW_CURSOR, GLFW_CURSOR_NORMAL); });
     return true;
 }
 

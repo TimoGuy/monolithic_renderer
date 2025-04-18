@@ -1,5 +1,11 @@
 #include "camera.h"
 
+// For camera_rig namespace.
+#include <array>
+#include <GLFW/glfw3.h>
+#include <iostream>
+#include "input_handling_public.h"
+////////////////////////////
 #include <atomic>
 using atomic_bool = std::atomic_bool;
 
@@ -187,11 +193,213 @@ void camera::internal__set_view_direction_and_rotation_axes(vec3 view_direction,
                                                             float_t cam_tilt__rot_x,
                                                             float_t cam_roll__rot_z)
 {
-    assert(std::abs(glm_vec3_norm2(view_direction) - 1.0f) < 1e-6f);  // Assert that already normalized.
+#if _DEBUG
+    // Assert that already normalized.
+    float_t norm2_deviation{ std::abs(glm_vec3_norm2(view_direction) - 1.0f) };
+    assert(norm2_deviation < 1e-6f);
+#endif
     glm_vec3_copy(view_direction, s_cam_view_direction);
     s_cam_rot_axes[0] = cam_tilt__rot_x;
     s_cam_rot_axes[1] = cam_pan__rot_y;
     s_cam_rot_axes[2] = cam_roll__rot_z;
 
     s_view_cache_invalid = true;
+}
+
+
+// Camera rig.
+// @TODO: See `camera.h`
+namespace camera_rig
+{
+
+static std::atomic_bool s_initialized{ false };
+static Camera_rig_type s_current_type{ Camera_rig_type::CAMERA_RIG_TYPE_INVALID };
+static std::function<void()> s_lock_cursor_to_window_callback;
+static std::function<void()> s_unlock_cursor_from_window_callback;
+
+struct Event_handler_set
+{
+    void (*enter_fn)();
+    void (*exit_fn)();
+    void (*update_fn)(float_t);
+};
+static std::array<Event_handler_set, NUM_VALID_CAMERA_RIG_TYPES> s_event_handlers;
+
+// Event handlers.
+// `CAMERA_RIG_TYPE_FIXED`
+void fixed_enter()
+{
+    assert(false);
+}
+
+void fixed_exit()
+{
+    assert(false);
+}
+
+void fixed_update(float_t delta_time)
+{
+    // @TODO: Get requested view and update the view to it.
+    assert(false);
+}
+
+// `CAMERA_RIG_TYPE_ORBIT`
+void orbit_enter()
+{
+    assert(false);
+}
+
+void orbit_exit()
+{
+    assert(false);
+}
+
+void orbit_update(float_t delta_time)
+{
+    // @TODO: Get requested view and update the view to it.
+    assert(false);
+}
+
+// `CAMERA_RIG_TYPE_FREECAM`
+namespace camera_rig_type_freecam
+{
+    vec3 position;
+    vec3 view_direction;
+    bool prev_camera_move;
+    bool is_cursor_captured;  // @NOTE: Really only on desktop.
+}
+
+void freecam_enter()
+{
+    // Read from camera.
+    glm_vec3_copy(camera::s_cam_position, camera_rig_type_freecam::position);
+    glm_vec3_copy(camera::s_cam_view_direction,
+                  camera_rig_type_freecam::view_direction);
+    camera_rig_type_freecam::prev_camera_move = false;
+    camera_rig_type_freecam::is_cursor_captured = false;
+}
+
+void freecam_exit()
+{
+    assert(false);
+}
+
+void freecam_update(float_t delta_time)
+{
+    auto& ihle{ input_handling::get_state_set_reading_handle(0).level_editor };
+    if (ihle.camera_move && !camera_rig_type_freecam::prev_camera_move)
+    {
+        // Rising edge.
+        s_lock_cursor_to_window_callback();
+        camera_rig_type_freecam::is_cursor_captured = true;
+    }
+    else if (!ihle.camera_move && camera_rig_type_freecam::prev_camera_move)
+    {
+        // Falling edge.
+        s_unlock_cursor_from_window_callback();
+        camera_rig_type_freecam::is_cursor_captured = false;
+    }
+    camera_rig_type_freecam::prev_camera_move = ihle.camera_move;
+
+    if (ihle.camera_move)
+    {
+        // Move camera with camera delta.
+        ihle.camera_delta;
+
+        vec3 world_up{ 0.0f, 1.0f, 0.0f };
+        vec3 world_down{ 0.0f, -1.0f, 0.0f };
+
+        // Update camera view direction with input.
+        vec3 facing_direction_right;
+        glm_cross(camera_rig_type_freecam::view_direction,
+                  world_up,
+                  facing_direction_right);
+        glm_normalize(facing_direction_right);
+
+        mat4 rotation = GLM_MAT4_IDENTITY_INIT;
+        glm_rotate(rotation, glm_rad(-ihle.camera_delta[1]), facing_direction_right);
+
+        vec3 new_view_direction;
+        glm_mat4_mulv3(rotation,
+                       camera_rig_type_freecam::view_direction,
+                       0.0f,
+                       new_view_direction);
+
+        if (glm_vec3_angle(new_view_direction, world_up) > glm_rad(5.0f) &&
+            glm_vec3_angle(new_view_direction, world_down) > glm_rad(5.0f))
+        {
+            glm_vec3_copy(new_view_direction, camera_rig_type_freecam::view_direction);
+        }
+
+        glm_mat4_identity(rotation);
+        glm_rotate(rotation, glm_rad(-ihle.camera_delta[0]), world_up);
+        glm_mat4_mulv3(rotation,
+                       camera_rig_type_freecam::view_direction,
+                       0.0f,
+                       camera_rig_type_freecam::view_direction);
+
+        // @NOTE: Need a normalization step at the end from float inaccuracy over time.
+        glm_vec3_normalize(camera_rig_type_freecam::view_direction);
+
+        // Apply new view to camera.
+        camera::set_view_direction_vec3(camera_rig_type_freecam::view_direction);
+    }
+}
+
+}  // namespace camera_rig
+
+
+void camera_rig::initialize(Camera_rig_type initial_type,
+                            std::function<void()>&& lock_cursor_to_window_callback,
+                            std::function<void()>&& unlock_cursor_from_window_callback)
+{
+    assert(!s_initialized);
+
+    s_event_handlers[CAMERA_RIG_TYPE_FIXED] = {
+        .enter_fn = fixed_enter,
+        .exit_fn = fixed_exit,
+        .update_fn = fixed_update,
+    };
+    s_event_handlers[CAMERA_RIG_TYPE_ORBIT] = {
+        .enter_fn = orbit_enter,
+        .exit_fn = orbit_exit,
+        .update_fn = orbit_update,
+    };
+    s_event_handlers[CAMERA_RIG_TYPE_FREECAM] = {
+        .enter_fn = freecam_enter,
+        .exit_fn = freecam_exit,
+        .update_fn = freecam_update,
+    };
+
+    s_initialized = true;
+
+    // Set initial camera rig type.
+    assert(initial_type != CAMERA_RIG_TYPE_INVALID);
+    set_camera_rig_type(initial_type);
+
+    // Set callbacks.
+    s_lock_cursor_to_window_callback = std::move(lock_cursor_to_window_callback);
+    s_unlock_cursor_from_window_callback = std::move(unlock_cursor_from_window_callback);
+}
+
+void camera_rig::set_camera_rig_type(Camera_rig_type type)
+{
+    assert(s_initialized);
+
+    // Execute exit function.
+    if (s_current_type != CAMERA_RIG_TYPE_INVALID)
+    {
+        s_event_handlers[s_current_type].exit_fn();
+    }
+
+    s_current_type = type;
+
+    // Execute enter function.
+    s_event_handlers[s_current_type].enter_fn();
+}
+
+void camera_rig::update(float_t delta_time)
+{
+    assert(s_initialized);
+    s_event_handlers[s_current_type].update_fn(delta_time);
 }

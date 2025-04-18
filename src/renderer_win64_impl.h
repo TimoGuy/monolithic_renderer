@@ -62,6 +62,7 @@ public:
         BUILD,
         LOAD_ASSETS,
         WAIT_FOR_GLOBAL_SETUP_COMPLETION,
+        CALCULATE_DELTA_TIME,
         UPDATE_DATA,
         RENDER,
         TEARDOWN,
@@ -149,15 +150,33 @@ public:
     };
     std::unique_ptr<Load_assets_job> m_load_assets_job;
 
-    class Update_poll_window_events_job : public Job_ifc
+    class Calculate_delta_time_job : public Job_ifc
     {
     public:
-        Update_poll_window_events_job(Job_source& source)
-            : Job_ifc("Poll Window Events job", source, k_glfw_window_job_key)
+        Calculate_delta_time_job(Job_source& source, Monolithic_renderer::Impl& pimpl)
+            : Job_ifc("Calcute Delta Time job", source)
+            , m_pimpl(pimpl)
         {
         }
 
         int32_t execute() override;
+
+        Monolithic_renderer::Impl& m_pimpl;
+    };
+    std::unique_ptr<Calculate_delta_time_job> m_calculate_delta_time_job;
+
+    class Update_poll_window_events_job : public Job_ifc
+    {
+    public:
+        Update_poll_window_events_job(Job_source& source, float_t& delta_time_ref)
+            : Job_ifc("Poll Window Events job", source, k_glfw_window_job_key)
+            , m_delta_time(delta_time_ref)
+        {
+        }
+
+        int32_t execute() override;
+
+        const float_t& m_delta_time;
     };
     std::unique_ptr<Update_poll_window_events_job> m_update_poll_window_events_job;
 
@@ -326,6 +345,9 @@ private:
     {
         return m_frames[m_frame_number % k_frame_overlap];
     }
+
+    float_t m_delta_time{ 0.0f };
+    double_t m_prev_time{ -6942.0 };
 };
 
 #endif  // _WIN64

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cinttypes>
+#include <functional>
 #include <vector>
 #include "cglm/cglm.h"
 #include "cglm/types-struct.h"
@@ -49,3 +50,30 @@ Imgui_requesting_data get_imgui_data();
 void set_imgui_data(Imgui_requesting_data&& changed_data);
 
 }  // namespace camera
+
+
+// @TODO: @REFACTOR: Look into moving the camera system or information into its
+//   own section. Or make just the virtual camera rig public but the actual
+//   rendering camera private.  -Thea 2025/04/16
+// @AMEND: Perhaps this could also be some kind of a class that acts as a decorator or smth?  -Thea 2025/04/16
+namespace camera_rig
+{
+
+enum Camera_rig_type : size_t
+{
+    CAMERA_RIG_TYPE_INVALID = (size_t)-1,
+    CAMERA_RIG_TYPE_FIXED = 0,  // No camera movement, fully manual view setting.
+    CAMERA_RIG_TYPE_ORBIT,      // Focuses on a certain position and calculates view.
+    CAMERA_RIG_TYPE_FREECAM,    // Fully unlocked by just pressing right click for user.
+    NUM_VALID_CAMERA_RIG_TYPES
+};
+
+void initialize(Camera_rig_type initial_type,
+                std::function<void()>&& lock_cursor_to_window_callback,
+                std::function<void()>&& unlock_cursor_from_window_callback);
+
+void set_camera_rig_type(Camera_rig_type type);
+
+void update(float_t delta_time);
+
+}  // namespace camera_rig
