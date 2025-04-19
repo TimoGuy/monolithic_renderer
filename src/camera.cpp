@@ -267,6 +267,9 @@ namespace camera_rig_type_freecam
     vec3 view_direction;
     bool prev_camera_move;
     bool is_cursor_captured;  // @NOTE: Really only on desktop.
+
+    // Settings.
+    float_t sensitivity{ 0.1f };
 }
 
 void freecam_enter()
@@ -304,7 +307,10 @@ void freecam_update(float_t delta_time)
     if (ihle.camera_move)
     {
         // Move camera with camera delta.
-        ihle.camera_delta;
+        vec2 cooked_cam_delta;
+        glm_vec2_scale(const_cast<float_t*>(ihle.camera_delta),
+                       camera_rig_type_freecam::sensitivity,
+                       cooked_cam_delta);
 
         vec3 world_up{ 0.0f, 1.0f, 0.0f };
         vec3 world_down{ 0.0f, -1.0f, 0.0f };
@@ -317,7 +323,7 @@ void freecam_update(float_t delta_time)
         glm_normalize(facing_direction_right);
 
         mat4 rotation = GLM_MAT4_IDENTITY_INIT;
-        glm_rotate(rotation, glm_rad(-ihle.camera_delta[1]), facing_direction_right);
+        glm_rotate(rotation, glm_rad(-cooked_cam_delta[1]), facing_direction_right);
 
         vec3 new_view_direction;
         glm_mat4_mulv3(rotation,
@@ -332,7 +338,7 @@ void freecam_update(float_t delta_time)
         }
 
         glm_mat4_identity(rotation);
-        glm_rotate(rotation, glm_rad(-ihle.camera_delta[0]), world_up);
+        glm_rotate(rotation, glm_rad(-cooked_cam_delta[0]), world_up);
         glm_mat4_mulv3(rotation,
                        camera_rig_type_freecam::view_direction,
                        0.0f,
