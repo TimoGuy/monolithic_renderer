@@ -270,6 +270,7 @@ namespace camera_rig_type_freecam
 
     // Settings.
     float_t sensitivity{ 0.1f };
+    float_t speed{ 20.0f };
 }
 
 void freecam_enter()
@@ -349,6 +350,24 @@ void freecam_update(float_t delta_time)
 
         // Apply new view to camera.
         camera::set_view_direction_vec3(camera_rig_type_freecam::view_direction);
+
+        vec2 cooked_mvt;
+        glm_vec2_scale(const_cast<float_t*>(ihle.movement),
+                       camera_rig_type_freecam::speed * delta_time,
+                       cooked_mvt);
+
+        glm_vec3_muladds(camera_rig_type_freecam::view_direction,
+                         cooked_mvt[1],
+                         camera_rig_type_freecam::position);
+        glm_vec3_muladds(facing_direction_right,
+                         cooked_mvt[0],
+                         camera_rig_type_freecam::position);
+
+        // Update camera position with input.
+        camera_rig_type_freecam::position[1] +=
+            ihle.move_world_y_axis * camera_rig_type_freecam::speed * delta_time;
+
+        camera::set_view_position(camera_rig_type_freecam::position);
     }
 }
 
